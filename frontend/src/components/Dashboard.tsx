@@ -1,6 +1,7 @@
 import Regulations from "./Regulations"
 import Policies from "./Policies"
 import Compliance from "./Compliance"
+import Research from "./Research"
 
 function Dashboard() {
     return (
@@ -32,6 +33,7 @@ function Dashboard() {
             <Regulations />
             <Policies />
             <Compliance />
+            <Research />
         </div>
     )
 }

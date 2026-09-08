@@ -30,6 +30,8 @@ from app.models.base import Base
 from app.models.user import User
 from app.models.regulation import Regulation
 from app.models.policy import Policy
+from app.models.compliance import Compliance
+from app.models.research import ResearchQuery
 
 target_metadata = Base.metadata
 
