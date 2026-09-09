@@ -6,6 +6,8 @@ from app.routers.policies import router as policies_router
 from app.routers.regulations import router as regulations_router
 from app.routers.compliance import router as compliance_router
 from app.routers.research import router as research_router
+from app.routers.document import router as document_router
+
 
 app = FastAPI()
 
@@ -22,6 +24,7 @@ app.include_router(regulations_router)
 app.include_router(policies_router)
 app.include_router(compliance_router)
 app.include_router(research_router)
+app.include_router(document_router)
 
 
 @app.get("/")

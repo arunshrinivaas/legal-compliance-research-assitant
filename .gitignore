@@ -151,3 +151,5 @@ venv/
 # Python cache
 __pycache__/
 *.py[cod]
+# Uploaded documents
+backend/uploads/
