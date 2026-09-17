@@ -7,15 +7,13 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
 
   return (
-    <div className="container">
-      <h1 className="title">Legal Compliance Research Assistant</h1>
-
+    <>
       {isLoggedIn ? (
         <Dashboard />
       ) : (
         <Auth onLoginSuccess={() => setIsLoggedIn(true)} />
       )}
-    </div>
+    </>
   )
 }
 

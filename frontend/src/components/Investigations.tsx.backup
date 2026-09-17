@@ -1,0 +1,1177 @@
+import { useEffect, useState } from "react"
+import {
+    Activity,
+    ArrowUp,
+    CheckCircle2,
+    ChevronRight,
+    FileText,
+    MessageCircle,
+    MoreHorizontal,
+    Search,
+    ShieldAlert,
+    Sparkles,
+    Users,
+} from "lucide-react"
+
+type Document = {
+    id: number
+    title: string
+    filename: string
+    document_type: string
+    jurisdiction: string
+    description: string | null
+    user_id: number
+    uploaded_at: string | null
+    chunks: number
+    embedded_chunks: number
+    processing_status: string
+}
+
+type RagSource = {
+    document_id: number
+    document_title: string
+    filename: string
+    chunk: number
+    distance: number
+}
+
+type Investigation = {
+    id: number
+    title: string
+    description: string | null
+    status: string
+    user_id: number
+}
+
+
+function Investigations() {
+    const [investigations, setInvestigations] = useState<Investigation[]>([])
+    const [selectedInvestigation, setSelectedInvestigation] =
+        useState<Investigation | null>(null)
+
+    const [loadingInvestigations, setLoadingInvestigations] = useState(true)
+    const [investigationMessage, setInvestigationMessage] = useState("")
+
+    const [documents, setDocuments] = useState<Document[]>([])
+    const [loadingDocuments, setLoadingDocuments] = useState(true)
+    const [message, setMessage] = useState("")
+
+    const [newTitle, setNewTitle] = useState("")
+    const [newDescription, setNewDescription] = useState("")
+    const [creatingInvestigation, setCreatingInvestigation] = useState(false)
+
+    const [question, setQuestion] = useState("")
+    const [answer, setAnswer] = useState("")
+    const [sources, setSources] = useState<RagSource[]>([])
+    const [ragLoading, setRagLoading] = useState(false)
+
+    useEffect(() => {
+        const token = localStorage.getItem("access_token")
+
+        if (!token) {
+            setInvestigationMessage("Authentication required")
+            setLoadingInvestigations(false)
+            setLoadingDocuments(false)
+            return
+        }
+
+        const loadInvestigations = async () => {
+            try {
+                const response = await fetch(
+                    "http://127.0.0.1:8000/api/v1/investigations/",
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                        },
+                    }
+                )
+
+                const data = await response.json()
+
+                if (!response.ok) {
+                    setInvestigationMessage(
+                        data.detail || "Unable to load investigations"
+                    )
+                    return
+                }
+
+                setInvestigations(data)
+
+                if (data.length > 0) {
+                    setSelectedInvestigation(data[0])
+                }
+            } catch {
+                setInvestigationMessage("Unable to connect to the backend")
+            } finally {
+                setLoadingInvestigations(false)
+            }
+        }
+
+        const loadDocuments = async () => {
+            try {
+                const response = await fetch(
+                    "http://127.0.0.1:8000/api/v1/documents/",
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                        },
+                    }
+                )
+
+                const data = await response.json()
+
+                if (!response.ok) {
+                    setMessage(
+                        data.detail ||
+                        data.error ||
+                        "Unable to load investigation evidence"
+                    )
+                    return
+                }
+
+                setDocuments(data.items || [])
+            } catch {
+                setMessage("Unable to connect to the backend")
+            } finally {
+                setLoadingDocuments(false)
+            }
+        }
+
+        loadInvestigations()
+        loadDocuments()
+    }, [])
+
+    const createInvestigation = async () => {
+        if (!newTitle.trim()) return
+
+        const token = localStorage.getItem("access_token")
+
+        if (!token) {
+            setInvestigationMessage("Authentication required")
+            return
+        }
+
+        setCreatingInvestigation(true)
+        setInvestigationMessage("")
+
+        try {
+            const response = await fetch(
+                "http://127.0.0.1:8000/api/v1/investigations/",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({
+                        title: newTitle.trim(),
+                        description: newDescription.trim() || null,
+                    }),
+                }
+            )
+
+            const data = await response.json()
+
+            if (!response.ok) {
+                setInvestigationMessage(
+                    data.detail || "Unable to create investigation"
+                )
+                return
+            }
+
+            setInvestigations((current) => [data, ...current])
+            setSelectedInvestigation(data)
+            setNewTitle("")
+            setNewDescription("")
+        } catch {
+            setInvestigationMessage("Unable to connect to the backend")
+        } finally {
+            setCreatingInvestigation(false)
+        }
+    }
+
+    const askInvestigation = async () => {
+        if (!question.trim()) return
+
+        if (!selectedInvestigation) {
+            setAnswer("Please select or create an investigation first.")
+            return
+        }
+
+        const token = localStorage.getItem("access_token")
+
+        if (!token) {
+            setAnswer("Authentication required")
+            return
+        }
+
+        setRagLoading(true)
+        setAnswer("")
+        setSources([])
+        setMessage("")
+
+        const currentQuestion = question.trim()
+
+        try {
+            const ragResponse = await fetch(
+                "http://127.0.0.1:8000/api/v1/rag/ask",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({
+                        question: currentQuestion,
+                        limit: 5,
+                    }),
+                }
+            )
+
+            const ragData = await ragResponse.json()
+
+            if (!ragResponse.ok) {
+                setAnswer(
+                    ragData.detail ||
+                    ragData.error ||
+                    "Unable to get an investigation answer"
+                )
+                return
+            }
+
+            const generatedAnswer = ragData.answer || ""
+
+            setAnswer(generatedAnswer)
+            setSources(ragData.sources || [])
+
+            const saveResponse = await fetch(
+                `http://127.0.0.1:8000/api/v1/investigations/${selectedInvestigation.id}/queries`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({
+                        question: currentQuestion,
+                        answer: generatedAnswer,
+                    }),
+                }
+            )
+
+            const saveData = await saveResponse.json()
+
+            if (!saveResponse.ok) {
+                setMessage(
+                    saveData.detail ||
+                    "The answer was generated but could not be saved to the investigation."
+                )
+                return
+            }
+
+            setQuestion("")
+        } catch {
+            setAnswer("Unable to connect to the backend")
+        } finally {
+            setRagLoading(false)
+        }
+    }
+
+    const investigation = selectedInvestigation
+
+    return (
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+            <section className="min-w-0">
+                <div className="rounded-xl border border-neutral-200 bg-white">
+                    <div className="border-b border-neutral-100 p-4">
+                        <div className="flex items-start justify-between gap-4">
+                            <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                    <span className="rounded-full bg-neutral-100 px-2 py-1 text-[8px] font-medium uppercase tracking-[0.08em] text-neutral-500">
+                                        Investigation
+                                    </span>
+
+                                    <span className="flex items-center gap-1 text-[8px] text-neutral-400">
+                                        <span className="h-1.5 w-1.5 rounded-full bg-neutral-700" />
+                                        {investigation?.status || "No investigation"}
+                                    </span>
+                                </div>
+
+                                <h1 className="mt-3 text-lg font-semibold tracking-tight">
+                                    {investigation?.title ||
+                                        "No investigation selected"}
+                                </h1>
+
+                                <p className="mt-1.5 max-w-2xl text-[10px] leading-5 text-neutral-500">
+                                    {investigation?.description ||
+                                        "Create an investigation to begin a persistent research workspace."}
+                                </p>
+                            </div>
+
+                            <button className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 text-neutral-400 hover:bg-neutral-50">
+                                <MoreHorizontal size={14} />
+                            </button>
+                        </div>
+
+                        <div className="mt-4 flex items-center justify-between border-t border-neutral-100 pt-3">
+                            <div className="flex items-center gap-2">
+                                <div className="flex -space-x-1.5">
+                                    <Avatar initials="PM" />
+                                    <Avatar initials="AS" />
+                                    <Avatar initials="RK" />
+                                </div>
+
+                                <span className="text-[9px] text-neutral-400">
+                                    3 people viewing
+                                </span>
+
+                                <span className="mx-1 text-neutral-200">•</span>
+
+                                <span className="flex items-center gap-1.5 text-[9px] text-neutral-400">
+                                    <Activity size={11} />
+                                    Live workspace
+                                </span>
+                            </div>
+
+                            <span className="text-[9px] text-neutral-400">
+                                {investigation
+                                    ? `Investigation #${String(
+                                        investigation.id
+                                    ).padStart(3, "0")}`
+                                    : "No investigation"}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <section className="mt-4 rounded-xl border border-neutral-200 bg-white">
+                    <SectionHeader
+                        icon={<Search size={14} />}
+                        title="Investigations"
+                        detail="Persistent investigation workspaces"
+                    />
+
+                    <div className="p-4">
+                        {loadingInvestigations ? (
+                            <p className="text-[10px] text-neutral-400">
+                                Loading investigations...
+                            </p>
+                        ) : investigations.length === 0 ? (
+                            <div className="space-y-3">
+                                <p className="text-[10px] text-neutral-400">
+                                    No investigations exist yet.
+                                </p>
+
+                                <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3">
+                                    <input
+                                        value={newTitle}
+                                        onChange={(event) =>
+                                            setNewTitle(event.target.value)
+                                        }
+                                        placeholder="Investigation title"
+                                        className="w-full bg-transparent text-[10px] outline-none placeholder:text-neutral-400"
+                                    />
+
+                                    <textarea
+                                        value={newDescription}
+                                        onChange={(event) =>
+                                            setNewDescription(event.target.value)
+                                        }
+                                        placeholder="Description (optional)"
+                                        rows={2}
+                                        className="mt-2 w-full resize-none border-t border-neutral-200 bg-transparent pt-2 text-[10px] leading-4 outline-none placeholder:text-neutral-400"
+                                    />
+
+                                    <div className="mt-2 flex justify-end">
+                                        <button
+                                            onClick={createInvestigation}
+                                            disabled={
+                                                creatingInvestigation ||
+                                                !newTitle.trim()
+                                            }
+                                            className="rounded-md bg-neutral-900 px-3 py-1.5 text-[9px] text-white disabled:cursor-not-allowed disabled:opacity-30"
+                                        >
+                                            {creatingInvestigation
+                                                ? "Creating..."
+                                                : "Create investigation"}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-2">
+                                {investigations.map((item) => (
+                                    <button
+                                        key={item.id}
+                                        onClick={() => {
+                                            setSelectedInvestigation(item)
+                                            setQuestion("")
+                                            setAnswer("")
+                                            setSources([])
+                                            setMessage("")
+                                        }}
+                                        className={`w-full rounded-lg border p-3 text-left transition ${selectedInvestigation?.id ===
+                                            item.id
+                                            ? "border-neutral-400 bg-neutral-50"
+                                            : "border-neutral-200 hover:bg-neutral-50"
+                                            }`}
+                                    >
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <p className="truncate text-[10px] font-medium">
+                                                    {item.title}
+                                                </p>
+
+                                                <p className="mt-1 truncate text-[8px] text-neutral-400">
+                                                    {item.description ||
+                                                        "No description"}
+                                                </p>
+                                            </div>
+
+                                            <span className="shrink-0 text-[8px] text-neutral-400">
+                                                {item.status}
+                                            </span>
+                                        </div>
+                                    </button>
+                                ))}
+
+                                <div className="mt-3 border-t border-neutral-100 pt-3">
+                                    <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3">
+                                        <p className="text-[9px] font-medium">
+                                            Create another investigation
+                                        </p>
+
+                                        <input
+                                            value={newTitle}
+                                            onChange={(event) =>
+                                                setNewTitle(event.target.value)
+                                            }
+                                            placeholder="Investigation title"
+                                            className="mt-2 w-full bg-transparent text-[10px] outline-none placeholder:text-neutral-400"
+                                        />
+
+                                        <textarea
+                                            value={newDescription}
+                                            onChange={(event) =>
+                                                setNewDescription(
+                                                    event.target.value
+                                                )
+                                            }
+                                            placeholder="Description (optional)"
+                                            rows={2}
+                                            className="mt-2 w-full resize-none border-t border-neutral-200 bg-transparent pt-2 text-[10px] leading-4 outline-none placeholder:text-neutral-400"
+                                        />
+
+                                        <div className="mt-2 flex justify-end">
+                                            <button
+                                                onClick={createInvestigation}
+                                                disabled={
+                                                    creatingInvestigation ||
+                                                    !newTitle.trim()
+                                                }
+                                                className="rounded-md bg-neutral-900 px-3 py-1.5 text-[9px] text-white disabled:cursor-not-allowed disabled:opacity-30"
+                                            >
+                                                {creatingInvestigation
+                                                    ? "Creating..."
+                                                    : "Create"}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {investigationMessage && (
+                            <p className="mt-3 text-[9px] text-neutral-500">
+                                {investigationMessage}
+                            </p>
+                        )}
+                    </div>
+                </section>
+
+                <section className="mt-4 rounded-xl border border-neutral-200 bg-white">
+                    <SectionHeader
+                        icon={<Sparkles size={14} />}
+                        title="Investigation Research"
+                        detail="Ask questions using the investigation knowledge base"
+                    />
+
+                    <div className="p-4">
+                        <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
+                            <div className="flex gap-3">
+                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-neutral-900 text-white">
+                                    <Sparkles size={14} />
+                                </div>
+
+                                <div className="min-w-0 flex-1">
+                                    <textarea
+                                        value={question}
+                                        onChange={(event) =>
+                                            setQuestion(event.target.value)
+                                        }
+                                        onKeyDown={(event) => {
+                                            if (
+                                                event.key === "Enter" &&
+                                                !event.shiftKey
+                                            ) {
+                                                event.preventDefault()
+                                                askInvestigation()
+                                            }
+                                        }}
+                                        rows={3}
+                                        placeholder="Ask about the regulations, policies, or evidence in this investigation..."
+                                        className="w-full resize-none bg-transparent text-[11px] leading-5 outline-none placeholder:text-neutral-400"
+                                    />
+
+                                    <div className="flex items-center justify-between border-t border-neutral-200 pt-2">
+                                        <span className="text-[8px] text-neutral-400">
+                                            Grounded in available evidence
+                                        </span>
+
+                                        <button
+                                            onClick={askInvestigation}
+                                            disabled={
+                                                ragLoading ||
+                                                !question.trim() ||
+                                                !selectedInvestigation
+                                            }
+                                            className="flex h-7 w-7 items-center justify-center rounded-full bg-neutral-900 text-white disabled:cursor-not-allowed disabled:opacity-30"
+                                        >
+                                            {ragLoading ? (
+                                                <Sparkles size={12} />
+                                            ) : (
+                                                <ArrowUp size={13} />
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {answer && (
+                            <div className="mt-3 rounded-xl border border-neutral-200 bg-white p-4">
+                                <div className="flex items-center gap-2">
+                                    <Sparkles size={13} />
+
+                                    <span className="text-[10px] font-semibold">
+                                        Investigation Assistant
+                                    </span>
+
+                                    <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[8px] text-neutral-500">
+                                        RAG
+                                    </span>
+                                </div>
+
+                                <div className="mt-3 space-y-2 text-[10px] leading-5 text-neutral-600">
+                                    {answer.split("\n").map((line, index) => (
+                                        <p key={index}>
+                                            {line || "\u00A0"}
+                                        </p>
+                                    ))}
+                                </div>
+
+                                {sources.length > 0 && (
+                                    <div className="mt-4 border-t border-neutral-100 pt-3">
+                                        <div className="mb-2 flex items-center justify-between">
+                                            <span className="text-[8px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
+                                                Sources
+                                            </span>
+
+                                            <span className="text-[8px] text-neutral-400">
+                                                {sources.length} retrieved
+                                            </span>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            {sources.map((source, index) => (
+                                                <div
+                                                    key={`${source.document_id}-${source.chunk}-${index}`}
+                                                    className="flex items-center gap-2.5 rounded-lg bg-neutral-50 p-2.5"
+                                                >
+                                                    <FileText
+                                                        size={12}
+                                                        className="shrink-0 text-neutral-500"
+                                                    />
+
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="truncate text-[9px] font-medium">
+                                                            {
+                                                                source.document_title
+                                                            }
+                                                        </p>
+
+                                                        <p className="mt-0.5 text-[8px] text-neutral-400">
+                                                            {source.filename} ·
+                                                            Chunk{" "}
+                                                            {source.chunk}
+                                                        </p>
+                                                    </div>
+
+                                                    <span className="text-[8px] text-neutral-400">
+                                                        {source.distance.toFixed(
+                                                            3
+                                                        )}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="mt-3 border-t border-neutral-100 pt-3">
+                                    <p className="text-[8px] text-neutral-400">
+                                        Saved to Investigation #
+                                        {selectedInvestigation?.id}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </section>
+
+                <section className="mt-4 rounded-xl border border-neutral-200 bg-white">
+                    <SectionHeader
+                        icon={<ShieldAlert size={14} />}
+                        title="Regulatory Comparison"
+                        detail="Regulation versus internal policy"
+                    />
+
+                    <div className="grid gap-3 p-4 md:grid-cols-2">
+                        <ComparisonCard
+                            label="Applicable Regulation"
+                            title="GDPR Article 5(1)(e)"
+                            text="Personal data should not be kept longer than necessary for the purposes for which it is processed."
+                        />
+
+                        <ComparisonCard
+                            label="Internal Policy"
+                            title="Internal Policy §4.2"
+                            text="Employee personal data is retained according to defined business and operational requirements."
+                        />
+                    </div>
+
+                    <div className="mx-4 mb-4 rounded-lg border border-neutral-200 bg-neutral-50 p-3">
+                        <div className="flex items-center gap-2">
+                            <ShieldAlert size={13} />
+
+                            <span className="text-[10px] font-semibold">
+                                Potential Compliance Gap
+                            </span>
+                        </div>
+
+                        <p className="mt-2 text-[9px] leading-4 text-neutral-500">
+                            The current evidence should be reviewed to
+                            determine whether the internal retention policy
+                            establishes sufficiently specific retention
+                            periods.
+                        </p>
+                    </div>
+                </section>
+
+                <section className="mt-4 rounded-xl border border-neutral-200 bg-white">
+                    <SectionHeader
+                        icon={<MessageCircle size={14} />}
+                        title="Discussion"
+                        detail="Human and AI collaboration"
+                    />
+
+                    <div className="divide-y divide-neutral-100">
+                        <Comment
+                            initials="PM"
+                            name="Priya M."
+                            role="Compliance"
+                            time="18 min ago"
+                            text="We should verify whether the retention schedule is documented for each category of employee data."
+                        />
+
+                        <Comment
+                            initials="AS"
+                            name="Arun S."
+                            role="Research"
+                            time="12 min ago"
+                            text="I found the current policy document in the evidence set. The relevant section is now available for review."
+                        />
+
+                        <Comment
+                            initials="AI"
+                            name="Research Assistant"
+                            role="AI"
+                            time="8 min ago"
+                            text="The available evidence suggests a review is required. I have linked the relevant document below."
+                            ai
+                        />
+                    </div>
+
+                    <div className="border-t border-neutral-100 p-3">
+                        <div className="flex items-center gap-2 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2.5">
+                            <input
+                                className="min-w-0 flex-1 bg-transparent text-[10px] outline-none placeholder:text-neutral-400"
+                                placeholder="Add a comment to this investigation..."
+                            />
+
+                            <button className="flex h-7 w-7 items-center justify-center rounded-md bg-neutral-900 text-white">
+                                <ChevronRight size={13} />
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <section className="mt-4 rounded-xl border border-neutral-200 bg-white">
+                    <SectionHeader
+                        icon={<FileText size={14} />}
+                        title="Evidence"
+                        detail="Documents available to this investigation"
+                    />
+
+                    <div className="divide-y divide-neutral-100">
+                        {loadingDocuments ? (
+                            <div className="p-5 text-center">
+                                <p className="text-[10px] text-neutral-400">
+                                    Loading evidence...
+                                </p>
+                            </div>
+                        ) : documents.length === 0 ? (
+                            <div className="p-5 text-center">
+                                <FileText
+                                    size={18}
+                                    className="mx-auto text-neutral-300"
+                                />
+
+                                <p className="mt-2 text-[10px] text-neutral-400">
+                                    No documents are currently available.
+                                </p>
+                            </div>
+                        ) : (
+                            documents.map((document) => (
+                                <EvidenceRow
+                                    key={document.id}
+                                    document={document}
+                                />
+                            ))
+                        )}
+                    </div>
+
+                    {message && (
+                        <div className="border-t border-neutral-100 px-4 py-3">
+                            <p className="text-[9px] text-neutral-500">
+                                {message}
+                            </p>
+                        </div>
+                    )}
+                </section>
+
+                <section className="mt-4 rounded-xl border border-neutral-200 bg-white">
+                    <SectionHeader
+                        icon={<Sparkles size={14} />}
+                        title="Multi-Agent Execution"
+                        detail="AI work happening inside the investigation"
+                    />
+
+                    <div className="divide-y divide-neutral-100">
+                        <AgentExecution
+                            agent="Regulation Analyst"
+                            action="Comparing applicable regulatory requirements"
+                            status="Completed"
+                        />
+
+                        <AgentExecution
+                            agent="Evidence Analyst"
+                            action="Reviewing supporting documents"
+                            status="Running"
+                        />
+
+                        <AgentExecution
+                            agent="Risk Analyst"
+                            action="Evaluating potential compliance impact"
+                            status="Queued"
+                        />
+                    </div>
+                </section>
+            </section>
+
+            <aside className="min-w-0">
+                <div className="sticky top-4 space-y-3">
+                    <InsightPanel
+                        title="Agent Activity"
+                        icon={<Sparkles size={13} />}
+                    >
+                        <div className="space-y-3">
+                            <AgentStatus
+                                name="Regulation Analyst"
+                                detail="Completed comparison"
+                                active={false}
+                            />
+
+                            <AgentStatus
+                                name="Evidence Analyst"
+                                detail="Reviewing evidence"
+                                active
+                            />
+
+                            <AgentStatus
+                                name="Risk Analyst"
+                                detail="Waiting for evidence"
+                                active={false}
+                            />
+                        </div>
+                    </InsightPanel>
+
+                    <InsightPanel
+                        title="Human Review"
+                        icon={<Users size={13} />}
+                    >
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-[10px] font-medium">
+                                    Review required
+                                </p>
+
+                                <p className="mt-1 text-[9px] leading-4 text-neutral-400">
+                                    A human decision is required before the
+                                    recommendation can be finalized.
+                                </p>
+                            </div>
+
+                            <button className="ml-3 shrink-0 rounded-md border border-neutral-200 px-2 py-1.5 text-[9px] text-neutral-500 hover:bg-neutral-50">
+                                Review
+                            </button>
+                        </div>
+                    </InsightPanel>
+
+                    <InsightPanel
+                        title="Risk Evaluation"
+                        icon={<ShieldAlert size={13} />}
+                    >
+                        <div className="flex items-end justify-between">
+                            <div>
+                                <p className="text-2xl font-semibold tracking-tight">
+                                    Medium
+                                </p>
+
+                                <p className="mt-1 text-[9px] text-neutral-400">
+                                    Preliminary assessment
+                                </p>
+                            </div>
+
+                            <span className="text-[9px] text-neutral-400">
+                                62 / 100
+                            </span>
+                        </div>
+
+                        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-neutral-100">
+                            <div className="h-full w-[62%] rounded-full bg-neutral-700" />
+                        </div>
+                    </InsightPanel>
+
+                    <InsightPanel
+                        title="Governance Recommendation"
+                        icon={<CheckCircle2 size={13} />}
+                    >
+                        <p className="text-[10px] font-medium leading-5">
+                            Review and formalize retention periods for
+                            employee data categories.
+                        </p>
+
+                        <p className="mt-2 text-[9px] leading-4 text-neutral-400">
+                            Recommendation remains subject to human review and
+                            supporting evidence validation.
+                        </p>
+                    </InsightPanel>
+
+                    <InsightPanel
+                        title="Recommendation Trace"
+                        icon={<Search size={13} />}
+                    >
+                        <div className="space-y-2">
+                            <TraceRow
+                                number="01"
+                                text="Regulatory requirement identified"
+                            />
+
+                            <TraceRow
+                                number="02"
+                                text="Internal policy evidence retrieved"
+                            />
+
+                            <TraceRow
+                                number="03"
+                                text="Potential gap identified"
+                            />
+
+                            <TraceRow
+                                number="04"
+                                text="Risk evaluation initiated"
+                            />
+                        </div>
+                    </InsightPanel>
+
+                    <InsightPanel
+                        title="Collaboration"
+                        icon={<Users size={13} />}
+                    >
+                        <div className="flex items-center gap-2">
+                            <Avatar initials="PM" />
+                            <Avatar initials="AS" />
+                            <Avatar initials="RK" />
+
+                            <span className="ml-1 text-[9px] text-neutral-400">
+                                3 people active
+                            </span>
+                        </div>
+
+                        <p className="mt-3 text-[9px] leading-4 text-neutral-400">
+                            Changes, comments and agent activity are shared
+                            with investigation participants.
+                        </p>
+                    </InsightPanel>
+                </div>
+            </aside>
+        </div>
+    )
+}
+
+function SectionHeader({
+    icon,
+    title,
+    detail,
+}: {
+    icon: React.ReactNode
+    title: string
+    detail: string
+}) {
+    return (
+        <div className="flex items-center justify-between border-b border-neutral-100 px-4 py-3">
+            <div className="flex items-center gap-2">
+                <span className="text-neutral-500">{icon}</span>
+
+                <div>
+                    <h2 className="text-[11px] font-semibold">{title}</h2>
+
+                    <p className="mt-0.5 text-[8px] text-neutral-400">
+                        {detail}
+                    </p>
+                </div>
+            </div>
+
+            <MoreHorizontal size={14} className="text-neutral-400" />
+        </div>
+    )
+}
+
+function ComparisonCard({
+    label,
+    title,
+    text,
+}: {
+    label: string
+    title: string
+    text: string
+}) {
+    return (
+        <div className="rounded-lg border border-neutral-200 p-3">
+            <p className="text-[8px] uppercase tracking-[0.12em] text-neutral-400">
+                {label}
+            </p>
+
+            <p className="mt-2 text-[10px] font-semibold">{title}</p>
+
+            <p className="mt-2 text-[9px] leading-4 text-neutral-500">
+                {text}
+            </p>
+        </div>
+    )
+}
+
+function Comment({
+    initials,
+    name,
+    role,
+    time,
+    text,
+    ai = false,
+}: {
+    initials: string
+    name: string
+    role: string
+    time: string
+    text: string
+    ai?: boolean
+}) {
+    return (
+        <div className="flex gap-3 p-4">
+            <div
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[8px] font-medium ${ai
+                    ? "bg-neutral-900 text-white"
+                    : "bg-neutral-100 text-neutral-600"
+                    }`}
+            >
+                {initials}
+            </div>
+
+            <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                    <p className="text-[10px] font-medium">{name}</p>
+
+                    <span className="text-[8px] text-neutral-400">
+                        {role}
+                    </span>
+
+                    <span className="text-[8px] text-neutral-300">•</span>
+
+                    <span className="text-[8px] text-neutral-400">
+                        {time}
+                    </span>
+                </div>
+
+                <p className="mt-2 text-[9px] leading-4 text-neutral-500">
+                    {text}
+                </p>
+            </div>
+        </div>
+    )
+}
+
+function EvidenceRow({ document }: { document: Document }) {
+    return (
+        <div className="flex items-center gap-3 px-4 py-3">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-neutral-100">
+                <FileText size={14} className="text-neutral-500" />
+            </div>
+
+            <div className="min-w-0 flex-1">
+                <p className="truncate text-[10px] font-medium">
+                    {document.title}
+                </p>
+
+                <p className="mt-1 truncate text-[8px] text-neutral-400">
+                    {document.filename} · {document.document_type} ·{" "}
+                    {document.jurisdiction}
+                </p>
+            </div>
+
+            <div className="shrink-0 text-right">
+                <span
+                    className={`rounded-full px-2 py-1 text-[8px] ${document.processing_status === "Ready"
+                        ? "bg-neutral-100 text-neutral-600"
+                        : "bg-neutral-50 text-neutral-400"
+                        }`}
+                >
+                    {document.processing_status}
+                </span>
+
+                {document.chunks > 0 && (
+                    <p className="mt-1 text-[8px] text-neutral-400">
+                        {document.embedded_chunks}/{document.chunks} chunks
+                    </p>
+                )}
+            </div>
+        </div>
+    )
+}
+
+function AgentExecution({
+    agent,
+    action,
+    status,
+}: {
+    agent: string
+    action: string
+    status: string
+}) {
+    const running = status === "Running"
+
+    return (
+        <div className="flex items-center gap-3 px-4 py-3">
+            <div
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${running ? "bg-neutral-900 text-white" : "bg-neutral-100"
+                    }`}
+            >
+                <Sparkles size={12} />
+            </div>
+
+            <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-medium">{agent}</p>
+
+                <p className="mt-0.5 truncate text-[9px] text-neutral-400">
+                    {action}
+                </p>
+            </div>
+
+            <span className="text-[8px] text-neutral-400">{status}</span>
+        </div>
+    )
+}
+
+function InsightPanel({
+    title,
+    icon,
+    children,
+}: {
+    title: string
+    icon: React.ReactNode
+    children: React.ReactNode
+}) {
+    return (
+        <div className="rounded-xl border border-neutral-200 bg-white p-4">
+            <div className="mb-3 flex items-center gap-2 border-b border-neutral-100 pb-3">
+                <span className="text-neutral-500">{icon}</span>
+
+                <h2 className="text-[10px] font-semibold">{title}</h2>
+            </div>
+
+            {children}
+        </div>
+    )
+}
+
+function AgentStatus({
+    name,
+    detail,
+    active,
+}: {
+    name: string
+    detail: string
+    active: boolean
+}) {
+    return (
+        <div className="flex items-center gap-2.5">
+            <span
+                className={`h-1.5 w-1.5 rounded-full ${active ? "bg-neutral-700" : "bg-neutral-300"
+                    }`}
+            />
+
+            <div className="min-w-0 flex-1">
+                <p className="text-[9px] font-medium">{name}</p>
+
+                <p className="mt-0.5 text-[8px] text-neutral-400">
+                    {detail}
+                </p>
+            </div>
+        </div>
+    )
+}
+
+function TraceRow({
+    number,
+    text,
+}: {
+    number: string
+    text: string
+}) {
+    return (
+        <div className="flex items-start gap-2.5">
+            <span className="text-[8px] text-neutral-300">{number}</span>
+
+            <p className="text-[9px] leading-4 text-neutral-500">{text}</p>
+        </div>
+    )
+}
+
+function Avatar({ initials }: { initials: string }) {
+    return (
+        <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-neutral-200 text-[7px] font-medium text-neutral-600">
+            {initials}
+        </div>
+    )
+
+    export default Investigations

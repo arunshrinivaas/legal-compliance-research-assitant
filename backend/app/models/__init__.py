@@ -1,28 +1,7 @@
-from sqlalchemy.orm import Session
-
-from app.models.document_chunk import DocumentChunk
-from app.services.text_chunker import chunk_text
-
-
-def create_document_chunks(
-    db: Session,
-    document_id: int,
-    text: str,
-) -> list[DocumentChunk]:
-    chunks = chunk_text(text)
-
-    document_chunks: list[DocumentChunk] = []
-
-    for index, chunk in enumerate(chunks):
-        document_chunk = DocumentChunk(
-            document_id=document_id,
-            chunk_index=index,
-            content=chunk,
-        )
-
-        db.add(document_chunk)
-        document_chunks.append(document_chunk)
-
-    db.commit()
-
-    return document_chunks
+# Import all mapped models here so SQLAlchemy can resolve string-based
+# relationship() targets (e.g. "Document", "Investigation") at runtime.
+# Order: InvestigationDocument first (no string relationships), then the
+# two endpoint classes that reference each other via secondary join.
+from app.models.investigation_document import InvestigationDocument  # noqa: F401
+from app.models.document import Document  # noqa: F401
+from app.models.investigation import Investigation  # noqa: F401

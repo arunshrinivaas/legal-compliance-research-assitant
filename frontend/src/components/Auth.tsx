@@ -15,16 +15,19 @@ function Auth({ onLoginSuccess }: AuthProps) {
         setMessage("Signing in...")
 
         try {
-            const response = await fetch("http://127.0.0.1:8000/auth/login", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    email,
-                    password,
-                }),
-            })
+            const response = await fetch(
+                "http://127.0.0.1:8000/api/v1/auth/login",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        email,
+                        password,
+                    }),
+                }
+            )
 
             const data = await response.json()
 
@@ -33,7 +36,14 @@ function Auth({ onLoginSuccess }: AuthProps) {
                 return
             }
 
-            setMessage(`Welcome, ${data.full_name}!`)
+            localStorage.setItem("access_token", data.access_token)
+
+            localStorage.setItem(
+                "current_user",
+                JSON.stringify(data.user)
+            )
+
+            setMessage(`Welcome, ${data.user.full_name}!`)
             onLoginSuccess()
         } catch {
             setMessage("Unable to connect to the backend")
@@ -44,17 +54,20 @@ function Auth({ onLoginSuccess }: AuthProps) {
         setMessage("Creating account...")
 
         try {
-            const response = await fetch("http://127.0.0.1:8000/auth/register", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    email,
-                    password,
-                    full_name: fullName,
-                }),
-            })
+            const response = await fetch(
+                "http://127.0.0.1:8000/api/v1/auth/register",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        email,
+                        password,
+                        full_name: fullName,
+                    }),
+                }
+            )
 
             const data = await response.json()
 
