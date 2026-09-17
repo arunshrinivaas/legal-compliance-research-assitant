@@ -153,3 +153,6 @@ __pycache__/
 *.py[cod]
 # Uploaded documents
 backend/uploads/
+
+# Python virtual environment (backend)
+backend/.venv/
