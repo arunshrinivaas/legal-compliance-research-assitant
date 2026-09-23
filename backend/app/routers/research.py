@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -28,12 +28,28 @@ def create_research_session(
 ):
     db_query = ResearchQuery(
         question=research_query.question,
-        status="Pending",
+        # Respect the status the caller sends (e.g. "Completed").
+        # Previously this always hard-coded "Pending".
+        status=research_query.status,
     )
     db.add(db_query)
     db.commit()
     db.refresh(db_query)
     return db_query
+
+
+@router.delete("/sessions/{session_id}", status_code=204)
+def delete_research_session(
+    session_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Remove a single research session from history."""
+    session = db.query(ResearchQuery).filter(ResearchQuery.id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    db.delete(session)
+    db.commit()
 
 
 @router.post("/query")

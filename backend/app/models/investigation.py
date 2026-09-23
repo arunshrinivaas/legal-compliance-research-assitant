@@ -8,6 +8,7 @@ from app.models.base import Base
 from app.models.investigation_document import InvestigationDocument
 
 if TYPE_CHECKING:
+    from app.models.agent_run import AgentRun
     from app.models.document import Document
 
 class Investigation(Base):
@@ -58,4 +59,10 @@ class Investigation(Base):
         "Document",
         secondary=InvestigationDocument.__table__,
         back_populates="investigations",
+    )
+
+    agent_runs: Mapped[list["AgentRun"]] = relationship(
+        "AgentRun",
+        back_populates="investigation",
+        cascade="all, delete-orphan",
     )

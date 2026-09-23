@@ -1,6 +1,7 @@
 from datetime import datetime
+from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -29,6 +30,15 @@ router = APIRouter(
 class InvestigationCreate(BaseModel):
     title: str = Field(min_length=1, max_length=255)
     description: str | None = None
+
+
+class InvestigationUpdate(BaseModel):
+    title: str = Field(min_length=1, max_length=255)
+    description: str | None = None
+
+
+class InvestigationStatusUpdate(BaseModel):
+    status: Literal["Active", "Archived"]
 
 
 class InvestigationResponse(BaseModel):
@@ -86,17 +96,17 @@ class CompareRequest(BaseModel):
     response_model=list[InvestigationResponse],
 )
 def list_investigations(
+    status: str | None = Query(None, description="Filter by status (e.g. Active, Archived)"),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    query = select(Investigation).where(Investigation.user_id == current_user.id)
+    
+    if status is not None:
+        query = query.where(Investigation.status == status)
+        
     investigations = db.scalars(
-        select(Investigation)
-        .where(
-            Investigation.user_id == current_user.id
-        )
-        .order_by(
-            Investigation.updated_at.desc()
-        )
+        query.order_by(Investigation.updated_at.desc())
     ).all()
 
     return investigations
@@ -149,6 +159,101 @@ def get_investigation(
         )
 
     return investigation
+
+
+@router.patch(
+    "/{investigation_id}",
+    response_model=InvestigationResponse,
+)
+def update_investigation(
+    investigation_id: int,
+    payload: InvestigationUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    investigation = db.scalar(
+        select(Investigation).where(
+            Investigation.id == investigation_id,
+            Investigation.user_id == current_user.id,
+        )
+    )
+
+    if investigation is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Investigation not found",
+        )
+        
+    if not payload.title.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Title cannot be empty",
+        )
+
+    investigation.title = payload.title.strip()
+    investigation.description = payload.description
+
+    db.commit()
+    db.refresh(investigation)
+
+    return investigation
+
+
+@router.patch(
+    "/{investigation_id}/status",
+    response_model=InvestigationResponse,
+)
+def update_investigation_status(
+    investigation_id: int,
+    payload: InvestigationStatusUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    investigation = db.scalar(
+        select(Investigation).where(
+            Investigation.id == investigation_id,
+            Investigation.user_id == current_user.id,
+        )
+    )
+
+    if investigation is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Investigation not found",
+        )
+
+    investigation.status = payload.status
+
+    db.commit()
+    db.refresh(investigation)
+
+    return investigation
+
+
+@router.delete(
+    "/{investigation_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_investigation(
+    investigation_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    investigation = db.scalar(
+        select(Investigation).where(
+            Investigation.id == investigation_id,
+            Investigation.user_id == current_user.id,
+        )
+    )
+
+    if investigation is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Investigation not found",
+        )
+
+    db.delete(investigation)
+    db.commit()
 
 
 # =========================================================

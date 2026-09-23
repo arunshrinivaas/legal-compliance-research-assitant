@@ -4,14 +4,19 @@ from fastapi.middleware.cors import CORSMiddleware
 import app.models
 
 from app.routers import (
+    agent,
+    audit,
     auth,
     compliance,
     document,
+    governance,
     investigations,
     policies,
     rag,
     regulations,
     research,
+    knowledge,
+    workspace,
 )
 
 
@@ -43,6 +48,11 @@ app.include_router(research.router)
 app.include_router(document.router)
 app.include_router(rag.router)
 app.include_router(investigations.router)
+app.include_router(agent.router)
+app.include_router(knowledge.router)
+app.include_router(workspace.router)
+app.include_router(audit.router)
+app.include_router(governance.router)
 
 
 @app.get("/")

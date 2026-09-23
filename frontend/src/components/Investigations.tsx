@@ -77,6 +77,29 @@ type InvestigationQuery = {
     created_at: string
 }
 
+type AgentEvidence = { document_id: number; document_title: string; filename: string; text_snippet: string }
+type AgentConflict = { description: string; conflicting_documents: string[] }
+type AgentEvidenceGap = { missing_information: string; impact_on_investigation: string }
+type AgentRequirement = { requirement: string; source_document: string }
+type AgentAction = { action: string; reason: string }
+type AgentCitation = { document_id: number; chunk: number; text: string }
+
+type AgentRunResponse = {
+    id: number
+    investigation_id: number
+    user_id: number
+    question: string
+    status: string
+    finding: string
+    evidence: AgentEvidence[]
+    conflicts: AgentConflict[]
+    evidence_gaps: AgentEvidenceGap[]
+    applicable_requirements: AgentRequirement[]
+    suggested_actions: AgentAction[]
+    citations: AgentCitation[]
+    created_at: string
+}
+
 
 function Investigations() {
     const [investigations, setInvestigations] = useState<Investigation[]>([])
@@ -113,6 +136,22 @@ function Investigations() {
     const [duplicateMessage, setDuplicateMessage] = useState(false)
     const [duplicateToastClosing, setDuplicateToastClosing] = useState(false)
 
+    const [expandedHistoryId, setExpandedHistoryId] = useState<number | null>(null)
+
+    const [shareModalOpen, setShareModalOpen] = useState(false)
+    const [shareTitle, setShareTitle] = useState("")
+    const [shareContent, setShareContent] = useState("")
+    const [shareSource, setShareSource] = useState("")
+    const [sharingKnowledge, setSharingKnowledge] = useState(false)
+    // ---------------------------------------------------------
+    // Agent state
+    // ---------------------------------------------------------
+    const [agentQuestion, setAgentQuestion] = useState("")
+    const [agentLoading, setAgentLoading] = useState(false)
+    const [agentRuns, setAgentRuns] = useState<AgentRunResponse[]>([])
+    const [agentError, setAgentError] = useState("")
+    const [expandedAgentRunId, setExpandedAgentRunId] = useState<number | null>(null)
+
     // ---------------------------------------------------------
     // Regulatory Comparison state
     // ---------------------------------------------------------
@@ -120,6 +159,61 @@ function Investigations() {
     const [compareLoading, setCompareLoading] = useState(false)
     const [compareResult, setCompareResult] = useState<ComparisonResult | null>(null)
     const [compareError, setCompareError] = useState("")
+
+    // ---------------------------------------------------------
+    // Lifecycle state
+    // ---------------------------------------------------------
+    const [editInvestigationId, setEditInvestigationId] = useState<number | null>(null)
+    const [editInvestigationTitle, setEditInvestigationTitle] = useState("")
+    const [editInvestigationDescription, setEditInvestigationDescription] = useState("")
+    const [editingInvestigation, setEditingInvestigation] = useState(false)
+
+    const [archivingInvestigation, setArchivingInvestigation] = useState(false)
+
+    const [deleteInvestigationId, setDeleteInvestigationId] = useState<number | null>(null)
+    const [deletingInvestigation, setDeletingInvestigation] = useState(false)
+    
+    const [showArchives, setShowArchives] = useState(false)
+    
+    const [activeMenuId, setActiveMenuId] = useState<number | null>(null)
+
+
+    
+    const runAgent = async () => {
+        if (!agentQuestion.trim() || !selectedInvestigation) return
+
+        setAgentLoading(true)
+        setAgentError("")
+        
+        try {
+            const token = localStorage.getItem("access_token")
+            const response = await fetch(
+                `http://127.0.0.1:8000/api/v1/agents/investigations/${selectedInvestigation.id}/run`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({ question: agentQuestion }),
+                }
+            )
+
+            if (!response.ok) {
+                const errData = await response.json().catch(() => null)
+                throw new Error(errData?.detail || "Failed to run agent")
+            }
+
+            const data: AgentRunResponse = await response.json()
+            setAgentRuns((prev) => [data, ...prev])
+            setAgentQuestion("")
+            setExpandedAgentRunId(data.id)
+        } catch (err: any) {
+            setAgentError(err.message)
+        } finally {
+            setAgentLoading(false)
+        }
+    }
 
     const refreshAvailableDocuments = async () => {
         const token = localStorage.getItem("access_token")
@@ -371,6 +465,122 @@ function Investigations() {
             setInvestigationMessage("Unable to connect to the backend")
         } finally {
             setCreatingInvestigation(false)
+        }
+    }
+
+    const updateInvestigation = async () => {
+        if (!editInvestigationId || !editInvestigationTitle.trim()) return
+
+        const token = localStorage.getItem("access_token")
+        if (!token) return
+
+        setEditingInvestigation(true)
+
+        try {
+            const response = await fetch(
+                `http://127.0.0.1:8000/api/v1/investigations/${editInvestigationId}`,
+                {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({
+                        title: editInvestigationTitle.trim(),
+                        description: editInvestigationDescription.trim() || null,
+                    }),
+                }
+            )
+
+            const data = await response.json()
+
+            if (response.ok) {
+                setInvestigations((current) =>
+                    current.map((inv) => (inv.id === editInvestigationId ? data : inv))
+                )
+                if (selectedInvestigation?.id === editInvestigationId) {
+                    setSelectedInvestigation(data)
+                }
+                setEditInvestigationId(null)
+            }
+        } catch {
+            // keep state
+        } finally {
+            setEditingInvestigation(false)
+        }
+    }
+
+    const updateInvestigationStatus = async (id: number, status: "Active" | "Archived") => {
+        const token = localStorage.getItem("access_token")
+        if (!token) return
+
+        setArchivingInvestigation(true)
+
+        try {
+            const response = await fetch(
+                `http://127.0.0.1:8000/api/v1/investigations/${id}/status`,
+                {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({ status }),
+                }
+            )
+
+            const data = await response.json()
+
+            if (response.ok) {
+                setInvestigations((current) =>
+                    current.map((inv) => (inv.id === id ? data : inv))
+                )
+                if (selectedInvestigation?.id === id) {
+                    setSelectedInvestigation(data)
+                }
+            }
+        } catch {
+            // keep state
+        } finally {
+            setArchivingInvestigation(false)
+        }
+    }
+
+    const deleteInvestigation = async () => {
+        if (!deleteInvestigationId) return
+
+        const token = localStorage.getItem("access_token")
+        if (!token) return
+
+        setDeletingInvestigation(true)
+
+        try {
+            const response = await fetch(
+                `http://127.0.0.1:8000/api/v1/investigations/${deleteInvestigationId}`,
+                {
+                    method: "DELETE",
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            )
+
+            if (response.ok || response.status === 204) {
+                setInvestigations((current) =>
+                    current.filter((inv) => inv.id !== deleteInvestigationId)
+                )
+                if (selectedInvestigation?.id === deleteInvestigationId) {
+                    setSelectedInvestigation(null)
+                    setInvestigationDocuments([])
+                    setResearchHistory([])
+                    setAgentRuns([])
+                }
+                setDeleteInvestigationId(null)
+            }
+        } catch {
+            // keep state
+        } finally {
+            setDeletingInvestigation(false)
         }
     }
 
@@ -901,7 +1111,8 @@ function Investigations() {
     }
 
     const investigation = selectedInvestigation
-
+    const activeInvestigations = investigations.filter((inv) => inv.status !== "Archived")
+    const archivedInvestigations = investigations.filter((inv) => inv.status === "Archived")
     return (
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
             <section className="min-w-0">
@@ -910,11 +1121,11 @@ function Investigations() {
                         <div className="flex items-start justify-between gap-4">
                             <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2">
-                                    <span className="rounded-full bg-neutral-100 px-2 py-1 text-[8px] font-medium uppercase tracking-[0.08em] text-neutral-500">
+                                    <span className="rounded-full bg-neutral-100 px-2 py-1 text-xs font-medium uppercase tracking-[0.08em] text-neutral-500">
                                         Investigation
                                     </span>
 
-                                    <span className="flex items-center gap-1 text-[8px] text-neutral-400">
+                                    <span className="flex items-center gap-1 text-xs text-neutral-400">
                                         <span className="h-1.5 w-1.5 rounded-full bg-neutral-700" />
                                         {investigation?.status || "No investigation"}
                                     </span>
@@ -925,7 +1136,7 @@ function Investigations() {
                                         "No investigation selected"}
                                 </h1>
 
-                                <p className="mt-1.5 max-w-2xl text-[10px] leading-5 text-neutral-500">
+                                <p className="mt-1.5 max-w-2xl text-xs leading-5 text-neutral-500">
                                     {investigation?.description ||
                                         "Create an investigation to begin a persistent research workspace."}
                                 </p>
@@ -944,19 +1155,19 @@ function Investigations() {
                                     <Avatar initials="RK" />
                                 </div>
 
-                                <span className="text-[9px] text-neutral-400">
+                                <span className="text-xs text-neutral-400">
                                     3 people viewing
                                 </span>
 
                                 <span className="mx-1 text-neutral-200">•</span>
 
-                                <span className="flex items-center gap-1.5 text-[9px] text-neutral-400">
+                                <span className="flex items-center gap-1.5 text-xs text-neutral-400">
                                     <Activity size={11} />
                                     Live workspace
                                 </span>
                             </div>
 
-                            <span className="text-[9px] text-neutral-400">
+                            <span className="text-xs text-neutral-400">
                                 {investigation
                                     ? `Investigation #${String(
                                         investigation.id
@@ -976,12 +1187,12 @@ function Investigations() {
 
                     <div className="p-4">
                         {loadingInvestigations ? (
-                            <p className="text-[10px] text-neutral-400">
+                            <p className="text-xs text-neutral-400">
                                 Loading investigations...
                             </p>
-                        ) : investigations.length === 0 ? (
+                        ) : activeInvestigations.length === 0 && archivedInvestigations.length === 0 ? (
                             <div className="space-y-3">
-                                <p className="text-[10px] text-neutral-400">
+                                <p className="text-xs text-neutral-400">
                                     No investigations exist yet.
                                 </p>
 
@@ -992,7 +1203,7 @@ function Investigations() {
                                             setNewTitle(event.target.value)
                                         }
                                         placeholder="Investigation title"
-                                        className="w-full bg-transparent text-[10px] outline-none placeholder:text-neutral-400"
+                                        className="w-full bg-transparent text-xs outline-none placeholder:text-neutral-400"
                                     />
 
                                     <textarea
@@ -1002,7 +1213,7 @@ function Investigations() {
                                         }
                                         placeholder="Description (optional)"
                                         rows={2}
-                                        className="mt-2 w-full resize-none border-t border-neutral-200 bg-transparent pt-2 text-[10px] leading-4 outline-none placeholder:text-neutral-400"
+                                        className="mt-2 w-full resize-none border-t border-neutral-200 bg-transparent pt-2 text-xs leading-4 outline-none placeholder:text-neutral-400"
                                     />
 
                                     <div className="mt-3 flex items-center justify-between gap-3 border-t border-neutral-200 pt-2">
@@ -1017,7 +1228,7 @@ function Investigations() {
                                         <button
                                             onClick={createInvestigation}
                                             disabled={creatingInvestigation || !newTitle.trim()}
-                                            className="rounded-md bg-neutral-900 px-3 py-1.5 text-[9px] text-white disabled:cursor-not-allowed disabled:opacity-30"
+                                            className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs text-white disabled:cursor-not-allowed disabled:opacity-30"
                                         >
                                             {creatingInvestigation ? "Creating..." : "Create investigation"}
                                         </button>
@@ -1026,44 +1237,183 @@ function Investigations() {
                             </div>
                         ) : (
                             <div className="space-y-2">
-                                {investigations.map((item) => (
-                                    <button
-                                        key={item.id}
-                                        onClick={() => {
-                                            setSelectedInvestigation(item)
-                                            setQuestion("")
-                                            setAnswer("")
-                                            setSources([])
-                                            setMessage("")
-                                        }}
-                                        className={`w-full rounded-lg border p-3 text-left transition ${selectedInvestigation?.id ===
-                                            item.id
-                                            ? "border-neutral-400 bg-neutral-50"
-                                            : "border-neutral-200 hover:bg-neutral-50"
-                                            }`}
-                                    >
-                                        <div className="flex items-center justify-between gap-3">
-                                            <div className="min-w-0">
-                                                <p className="truncate text-[10px] font-medium">
-                                                    {item.title}
-                                                </p>
+                                {activeInvestigations.map((item) => (
+                                    <div key={item.id} className="group relative">
+                                        <button
+                                            onClick={() => {
+                                                setSelectedInvestigation(item)
+                                                setQuestion("")
+                                                setAnswer("")
+                                                setSources([])
+                                                setMessage("")
+                                                setAgentRuns([])
+                                                setAgentQuestion("")
+                                                setAgentError("")
+                                                setExpandedAgentRunId(null)
+                                                setExpandedHistoryId(null)
+                                                setActiveMenuId(null)
+                                            }}
+                                            className={`w-full rounded-lg border p-3 text-left transition ${selectedInvestigation?.id === item.id
+                                                    ? "border-neutral-400 bg-neutral-50"
+                                                    : "border-neutral-200 hover:bg-neutral-50"
+                                                }`}
+                                        >
+                                            <div className="flex items-center justify-between gap-3">
+                                                <div className="min-w-0 pr-6">
+                                                    <p className="truncate text-xs font-medium">
+                                                        {item.title}
+                                                    </p>
 
-                                                <p className="mt-1 truncate text-[8px] text-neutral-400">
-                                                    {item.description ||
-                                                        "No description"}
-                                                </p>
+                                                    <p className="mt-1 truncate text-xs text-neutral-400">
+                                                        {item.description ||
+                                                            "No description"}
+                                                    </p>
+                                                </div>
                                             </div>
-
-                                            <span className="shrink-0 text-[8px] text-neutral-400">
-                                                {item.status}
-                                            </span>
+                                        </button>
+                                        <div className="absolute right-2 top-2 hidden group-hover:block">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    setActiveMenuId(activeMenuId === item.id ? null : item.id)
+                                                }}
+                                                className="flex h-6 w-6 items-center justify-center rounded-md bg-white border border-neutral-200 text-neutral-500 hover:bg-neutral-50"
+                                            >
+                                                <MoreHorizontal size={12} />
+                                            </button>
+                                            {activeMenuId === item.id && (
+                                                <div className="absolute right-0 z-10 mt-1 w-32 rounded-md border border-neutral-200 bg-white py-1 shadow-lg">
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            setActiveMenuId(null)
+                                                            setEditInvestigationId(item.id)
+                                                            setEditInvestigationTitle(item.title)
+                                                            setEditInvestigationDescription(item.description || "")
+                                                        }}
+                                                        className="block w-full px-3 py-1.5 text-left text-xs text-neutral-700 hover:bg-neutral-50"
+                                                    >
+                                                        Edit
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            setActiveMenuId(null)
+                                                            updateInvestigationStatus(item.id, "Archived")
+                                                        }}
+                                                        disabled={archivingInvestigation}
+                                                        className="block w-full px-3 py-1.5 text-left text-xs text-neutral-700 hover:bg-neutral-50"
+                                                    >
+                                                        Archive
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            setActiveMenuId(null)
+                                                            setDeleteInvestigationId(item.id)
+                                                        }}
+                                                        className="block w-full px-3 py-1.5 text-left text-xs text-red-600 hover:bg-red-50"
+                                                    >
+                                                        Delete
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
-                                    </button>
+                                    </div>
                                 ))}
+
+                                {archivedInvestigations.length > 0 && (
+                                    <div className="mt-6 border-t border-neutral-100 pt-4">
+                                        <button
+                                            onClick={() => setShowArchives(!showArchives)}
+                                            className="flex w-full items-center justify-between text-xs font-medium text-neutral-500 hover:text-neutral-700"
+                                        >
+                                            <span>Archives ({archivedInvestigations.length})</span>
+                                            <span>{showArchives ? "Hide" : "Show"}</span>
+                                        </button>
+                                        
+                                        {showArchives && (
+                                            <div className="mt-3 space-y-2">
+                                                {archivedInvestigations.map((item) => (
+                                                    <div key={item.id} className="group relative">
+                                                        <button
+                                                            onClick={() => {
+                                                                setSelectedInvestigation(item)
+                                                                setQuestion("")
+                                                                setAnswer("")
+                                                                setSources([])
+                                                                setMessage("")
+                                                                setAgentRuns([])
+                                                                setAgentQuestion("")
+                                                                setAgentError("")
+                                                                setExpandedAgentRunId(null)
+                                                                setExpandedHistoryId(null)
+                                                                setActiveMenuId(null)
+                                                            }}
+                                                            className={`w-full rounded-lg border border-dashed p-3 text-left transition ${selectedInvestigation?.id === item.id
+                                                                    ? "border-neutral-400 bg-neutral-50"
+                                                                    : "border-neutral-200 hover:bg-neutral-50"
+                                                                }`}
+                                                        >
+                                                            <div className="flex items-center justify-between gap-3 opacity-60">
+                                                                <div className="min-w-0 pr-6">
+                                                                    <p className="truncate text-xs font-medium">
+                                                                        {item.title}
+                                                                    </p>
+
+                                                                    <p className="mt-1 truncate text-xs text-neutral-400">
+                                                                        {item.description ||
+                                                                            "No description"}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        </button>
+                                                        <div className="absolute right-2 top-2 hidden group-hover:block">
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation()
+                                                                    setActiveMenuId(activeMenuId === item.id ? null : item.id)
+                                                                }}
+                                                                className="flex h-6 w-6 items-center justify-center rounded-md bg-white border border-neutral-200 text-neutral-500 hover:bg-neutral-50"
+                                                            >
+                                                                <MoreHorizontal size={12} />
+                                                            </button>
+                                                            {activeMenuId === item.id && (
+                                                                <div className="absolute right-0 z-10 mt-1 w-32 rounded-md border border-neutral-200 bg-white py-1 shadow-lg">
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation()
+                                                                            setActiveMenuId(null)
+                                                                            updateInvestigationStatus(item.id, "Active")
+                                                                        }}
+                                                                        disabled={archivingInvestigation}
+                                                                        className="block w-full px-3 py-1.5 text-left text-xs text-neutral-700 hover:bg-neutral-50"
+                                                                    >
+                                                                        Restore
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation()
+                                                                            setActiveMenuId(null)
+                                                                            setDeleteInvestigationId(item.id)
+                                                                        }}
+                                                                        className="block w-full px-3 py-1.5 text-left text-xs text-red-600 hover:bg-red-50"
+                                                                    >
+                                                                        Delete
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
 
                                 <div className="mt-3 border-t border-neutral-100 pt-3">
                                     <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3">
-                                        <p className="text-[9px] font-medium">
+                                        <p className="text-xs font-medium">
                                             Create another investigation
                                         </p>
 
@@ -1073,7 +1423,7 @@ function Investigations() {
                                                 setNewTitle(event.target.value)
                                             }
                                             placeholder="Investigation title"
-                                            className="mt-2 w-full bg-transparent text-[10px] outline-none placeholder:text-neutral-400"
+                                            className="mt-2 w-full bg-transparent text-xs outline-none placeholder:text-neutral-400"
                                         />
 
                                         <textarea
@@ -1085,17 +1435,17 @@ function Investigations() {
                                             }
                                             placeholder="Description (optional)"
                                             rows={2}
-                                            className="mt-2 w-full resize-none border-t border-neutral-200 bg-transparent pt-2 text-[10px] leading-4 outline-none placeholder:text-neutral-400"
+                                            className="mt-2 w-full resize-none border-t border-neutral-200 bg-transparent pt-2 text-xs leading-4 outline-none placeholder:text-neutral-400"
                                         />
 
                                         {showAttachmentMenu && (
                                             <div className="mt-3 rounded-lg border border-neutral-200 bg-white p-3">
                                                 <div className="flex items-start justify-between gap-3">
                                                     <div className="min-w-0">
-                                                        <p className="text-[9px] font-semibold text-neutral-700">
+                                                        <p className="text-xs font-semibold text-neutral-700">
                                                             Investigation evidence
                                                         </p>
-                                                        <p className="mt-0.5 text-[8px] leading-4 text-neutral-400">
+                                                        <p className="mt-0.5 text-xs leading-4 text-neutral-400">
                                                             {selectedInvestigation
                                                                 ? `Documents attached to ${selectedInvestigation.title}`
                                                                 : "Create the investigation first, then attach evidence."}
@@ -1104,7 +1454,7 @@ function Investigations() {
                                                     <button
                                                         type="button"
                                                         onClick={() => setShowAttachmentMenu(false)}
-                                                        className="shrink-0 text-[8px] text-neutral-400 hover:text-neutral-700"
+                                                        className="shrink-0 text-xs text-neutral-400 hover:text-neutral-700"
                                                     >
                                                         Close
                                                     </button>
@@ -1113,15 +1463,15 @@ function Investigations() {
                                                 {selectedInvestigation ? (
                                                     <>
                                                         <div className="mt-3">
-                                                            <p className="mb-1.5 text-[8px] font-medium uppercase tracking-wide text-neutral-400">
+                                                            <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-neutral-400">
                                                                 Attached documents
                                                             </p>
                                                             {loadingInvestigationDocuments ? (
-                                                                <p className="rounded-md bg-neutral-50 p-2 text-[8px] text-neutral-400">
+                                                                <p className="rounded-md bg-neutral-50 p-2 text-xs text-neutral-400">
                                                                     Loading attached documents...
                                                                 </p>
                                                             ) : investigationDocuments.length === 0 ? (
-                                                                <p className="rounded-md bg-neutral-50 p-2 text-[8px] text-neutral-400">
+                                                                <p className="rounded-md bg-neutral-50 p-2 text-xs text-neutral-400">
                                                                     No documents attached yet.
                                                                 </p>
                                                             ) : (
@@ -1132,10 +1482,10 @@ function Investigations() {
                                                                                 <FileText size={12} className="text-neutral-500" />
                                                                             </div>
                                                                             <div className="min-w-0 flex-1">
-                                                                                <p className="truncate text-[9px] font-medium text-neutral-700">
+                                                                                <p className="truncate text-xs font-medium text-neutral-700">
                                                                                     {document.title}
                                                                                 </p>
-                                                                                <p className="mt-0.5 truncate text-[8px] text-neutral-400">
+                                                                                <p className="mt-0.5 truncate text-xs text-neutral-400">
                                                                                     {document.filename} · {document.processing_status}
                                                                                 </p>
                                                                             </div>
@@ -1163,7 +1513,7 @@ function Investigations() {
                                                         </div>
 
                                                         <div className="mt-3 border-t border-neutral-100 pt-3">
-                                                            <p className="mb-1.5 text-[8px] font-medium uppercase tracking-wide text-neutral-400">
+                                                            <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-neutral-400">
                                                                 Add document
                                                             </p>
 
@@ -1176,10 +1526,10 @@ function Investigations() {
                                                                 >
                                                                     <Upload size={12} className="shrink-0 text-neutral-500" />
                                                                     <span className="min-w-0">
-                                                                        <span className="block text-[8px] font-medium text-neutral-700">
+                                                                        <span className="block text-xs font-medium text-neutral-700">
                                                                             {uploadingDocument ? "Uploading..." : "From device"}
                                                                         </span>
-                                                                        <span className="block text-[7px] text-neutral-400">
+                                                                        <span className="block text-xs text-neutral-400">
                                                                             PDF, DOCX, TXT
                                                                         </span>
                                                                     </span>
@@ -1192,10 +1542,10 @@ function Investigations() {
                                                                 >
                                                                     <HardDrive size={12} className="shrink-0 text-neutral-500" />
                                                                     <span className="min-w-0">
-                                                                        <span className="block text-[8px] font-medium text-neutral-700">
+                                                                        <span className="block text-xs font-medium text-neutral-700">
                                                                             Google Drive
                                                                         </span>
-                                                                        <span className="block text-[7px] text-neutral-400">
+                                                                        <span className="block text-xs text-neutral-400">
                                                                             Connect account
                                                                         </span>
                                                                     </span>
@@ -1208,10 +1558,10 @@ function Investigations() {
                                                                 >
                                                                     <Cloud size={12} className="shrink-0 text-neutral-500" />
                                                                     <span className="min-w-0">
-                                                                        <span className="block text-[8px] font-medium text-neutral-700">
+                                                                        <span className="block text-xs font-medium text-neutral-700">
                                                                             Dropbox
                                                                         </span>
-                                                                        <span className="block text-[7px] text-neutral-400">
+                                                                        <span className="block text-xs text-neutral-400">
                                                                             Connect account
                                                                         </span>
                                                                     </span>
@@ -1234,7 +1584,7 @@ function Investigations() {
 
                                                             {libraryDocuments.length > 0 && (
                                                                 <>
-                                                                    <p className="mb-1.5 mt-3 text-[8px] font-medium uppercase tracking-wide text-neutral-400">
+                                                                    <p className="mb-1.5 mt-3 text-xs font-medium uppercase tracking-wide text-neutral-400">
                                                                         From document library
                                                                     </p>
                                                                     <div className="max-h-44 space-y-1.5 overflow-y-auto">
@@ -1244,8 +1594,8 @@ function Investigations() {
                                                                                 <div key={document.id} className="flex items-center gap-2 rounded-md border border-neutral-100 p-2">
                                                                                     <FileText size={12} className="shrink-0 text-neutral-400" />
                                                                                     <div className="min-w-0 flex-1">
-                                                                                        <p className="truncate text-[9px] font-medium">{document.title}</p>
-                                                                                        <p className="mt-0.5 truncate text-[8px] text-neutral-400">{document.filename}</p>
+                                                                                        <p className="truncate text-xs font-medium">{document.title}</p>
+                                                                                        <p className="mt-0.5 truncate text-xs text-neutral-400">{document.filename}</p>
                                                                                     </div>
                                                                                     <button
                                                                                         type="button"
@@ -1283,7 +1633,7 @@ function Investigations() {
                                                         </div>
                                                     </>
                                                 ) : (
-                                                    <p className="mt-3 rounded-md bg-neutral-50 p-2 text-[8px] leading-4 text-neutral-400">
+                                                    <p className="mt-3 rounded-md bg-neutral-50 p-2 text-xs leading-4 text-neutral-400">
                                                         Enter a title and click Create. The new investigation will then be selected and this panel will stay open so you can add documents immediately.
                                                     </p>
                                                 )}
@@ -1302,7 +1652,7 @@ function Investigations() {
                                             <button
                                                 onClick={createInvestigation}
                                                 disabled={creatingInvestigation || !newTitle.trim()}
-                                                className="rounded-md bg-neutral-900 px-3 py-1.5 text-[9px] text-white disabled:cursor-not-allowed disabled:opacity-30"
+                                                className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs text-white disabled:cursor-not-allowed disabled:opacity-30"
                                             >
                                                 {creatingInvestigation ? "Creating..." : "Create"}
                                             </button>
@@ -1313,7 +1663,7 @@ function Investigations() {
                         )}
 
                         {investigationMessage && (
-                            <p className="mt-3 text-[9px] text-neutral-500">
+                            <p className="mt-3 text-xs text-neutral-500">
                                 {investigationMessage}
                             </p>
                         )}
@@ -1351,11 +1701,11 @@ function Investigations() {
                                         }}
                                         rows={3}
                                         placeholder="Ask about the regulations, policies, or evidence in this investigation..."
-                                        className="w-full resize-none bg-transparent text-[11px] leading-5 outline-none placeholder:text-neutral-400"
+                                        className="w-full resize-none bg-transparent text-sm leading-5 outline-none placeholder:text-neutral-400"
                                     />
 
                                     <div className="flex items-center justify-between border-t border-neutral-200 pt-2">
-                                        <span className="text-[8px] text-neutral-400">
+                                        <span className="text-xs text-neutral-400">
                                             {selectedInvestigation
                                                 ? `${investigationDocuments.length} document${investigationDocuments.length === 1 ? "" : "s"} in evidence`
                                                 : "Select an investigation to begin"}
@@ -1386,16 +1736,16 @@ function Investigations() {
                                 <div className="flex items-center gap-2">
                                     <Sparkles size={13} />
 
-                                    <span className="text-[10px] font-semibold">
+                                    <span className="text-xs font-semibold">
                                         Investigation Assistant
                                     </span>
 
-                                    <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[8px] text-neutral-500">
+                                    <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-500">
                                         RAG
                                     </span>
                                 </div>
 
-                                <div className="mt-3 space-y-2 text-[10px] leading-5 text-neutral-600">
+                                <div className="mt-3 space-y-2 text-xs leading-5 text-neutral-600">
                                     {answer.split("\n").map((line, index) => (
                                         <p key={index}>
                                             {line || "\u00A0"}
@@ -1406,11 +1756,11 @@ function Investigations() {
                                 {sources.length > 0 && (
                                     <div className="mt-4 border-t border-neutral-100 pt-3">
                                         <div className="mb-2 flex items-center justify-between">
-                                            <span className="text-[8px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
+                                            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-neutral-400">
                                                 Sources
                                             </span>
 
-                                            <span className="text-[8px] text-neutral-400">
+                                            <span className="text-xs text-neutral-400">
                                                 {sources.length} retrieved
                                             </span>
                                         </div>
@@ -1427,20 +1777,20 @@ function Investigations() {
                                                     />
 
                                                     <div className="min-w-0 flex-1">
-                                                        <p className="truncate text-[9px] font-medium">
+                                                        <p className="truncate text-xs font-medium">
                                                             {
                                                                 source.document_title
                                                             }
                                                         </p>
 
-                                                        <p className="mt-0.5 text-[8px] text-neutral-400">
+                                                        <p className="mt-0.5 text-xs text-neutral-400">
                                                             {source.filename} ·
                                                             Chunk{" "}
                                                             {source.chunk}
                                                         </p>
                                                     </div>
 
-                                                    <span className="text-[8px] text-neutral-400">
+                                                    <span className="text-xs text-neutral-400">
                                                         {source.distance.toFixed(
                                                             3
                                                         )}
@@ -1452,7 +1802,7 @@ function Investigations() {
                                 )}
 
                                 <div className="mt-3 border-t border-neutral-100 pt-3">
-                                    <p className="text-[8px] text-neutral-400">
+                                    <p className="text-xs text-neutral-400">
                                         Saved to Investigation #
                                         {selectedInvestigation?.id}
                                     </p>
@@ -1464,16 +1814,16 @@ function Investigations() {
                             <div className="mt-5 border-t border-neutral-100 pt-5">
                                 <div className="mb-3 flex items-center justify-between">
                                     <div>
-                                        <h3 className="text-[10px] font-semibold">
+                                        <h3 className="text-xs font-semibold">
                                             Research History
                                         </h3>
-                                        <p className="mt-1 text-[8px] text-neutral-400">
+                                        <p className="mt-1 text-xs text-neutral-400">
                                             Saved questions and answers for this investigation
                                         </p>
                                     </div>
 
                                     {researchHistory.length > 0 && (
-                                        <span className="text-[8px] text-neutral-400">
+                                        <span className="text-xs text-neutral-400">
                                             {researchHistory.length} saved
                                         </span>
                                     )}
@@ -1481,45 +1831,74 @@ function Investigations() {
 
                                 {loadingHistory ? (
                                     <div className="rounded-lg border border-neutral-100 bg-neutral-50 px-4 py-5 text-center">
-                                        <p className="text-[9px] text-neutral-400">
+                                        <p className="text-xs text-neutral-400">
                                             Loading research history...
                                         </p>
                                     </div>
                                 ) : researchHistory.length === 0 ? (
                                     <div className="rounded-lg border border-dashed border-neutral-200 px-4 py-5 text-center">
-                                        <p className="text-[9px] text-neutral-400">
+                                        <p className="text-xs text-neutral-400">
                                             No saved research yet.
                                         </p>
                                     </div>
                                 ) : (
-                                    <div className="space-y-2">
+                                    <div className="flex flex-col gap-2">
                                         {researchHistory.map((item) => (
-                                            <button
-                                                key={item.id}
-                                                type="button"
-                                                onClick={() => {
-                                                    setQuestion(item.question)
-                                                    setAnswer(item.answer || "")
-                                                    setSources([])
-                                                }}
-                                                className="w-full rounded-lg border border-neutral-100 bg-neutral-50 p-3 text-left transition hover:border-neutral-200 hover:bg-white"
-                                            >
-                                                <div className="flex items-start justify-between gap-3">
-                                                    <p className="text-[9px] font-medium leading-4 text-neutral-700">
-                                                        {item.question}
-                                                    </p>
-
-                                                    <span className="shrink-0 text-[8px] text-neutral-400">
-                                                        {new Date(item.created_at).toLocaleDateString()}
-                                                    </span>
-                                                </div>
-
-                                                {item.answer && (
-                                                    <p className="mt-2 line-clamp-2 text-[8px] leading-4 text-neutral-500">
-                                                        {item.answer}
-                                                    </p>
+                                            <div key={item.id} className="rounded-lg border border-neutral-100 bg-neutral-50 overflow-hidden">
+                                                <button
+                                                    type="button" 
+                                                    className="w-full p-3 text-left transition hover:bg-white cursor-pointer block"
+                                                    onClick={() => setExpandedHistoryId(expandedHistoryId === item.id ? null : item.id)}
+                                                >
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <p className="text-xs font-medium leading-4 text-neutral-700">
+                                                            {item.question}
+                                                        </p>
+                                                        <span className="shrink-0 text-xs text-neutral-400">
+                                                            {new Date(item.created_at).toLocaleDateString()}
+                                                        </span>
+                                                    </div>
+                                                    {expandedHistoryId !== item.id && item.answer && (
+                                                        <p className="mt-2 line-clamp-2 text-xs leading-4 text-neutral-500">
+                                                            {item.answer}
+                                                        </p>
+                                                    )}
+                                                </button>
+                                                
+                                                {expandedHistoryId === item.id && (
+                                                    <div className="border-t border-neutral-100 bg-white p-3">
+                                                        <div className="flex justify-between items-center mb-3">
+                                                            <h4 className="text-xs font-semibold text-neutral-700">Research Result</h4>
+                                                            <div className="flex items-center gap-2">
+                                                                <button 
+                                                                    onClick={() => {
+                                                                        setShareTitle(`Finding: ${item.question}`)
+                                                                        setShareContent(item.answer || "")
+                                                                        setShareSource(`Investigation ID: ${selectedInvestigation?.id}`)
+                                                                        setShareModalOpen(true)
+                                                                    }}
+                                                                    className="flex items-center gap-1 text-xs px-2 py-1 bg-white border border-neutral-200 text-neutral-700 rounded-md hover:bg-neutral-50 transition"
+                                                                >
+                                                                    <Upload size={10} /> Share Finding
+                                                                </button>
+                                                                <button 
+                                                                    onClick={() => {
+                                                                        setQuestion(item.question)
+                                                                        setAnswer(item.answer || "")
+                                                                        setSources([])
+                                                                    }}
+                                                                    className="text-xs px-2 py-1 bg-neutral-900 text-white rounded-md hover:bg-neutral-800 transition"
+                                                                >
+                                                                    Load into Research
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                        <p className="text-xs leading-5 text-neutral-600 mb-4 whitespace-pre-wrap">
+                                                            {item.answer}
+                                                        </p>
+                                                    </div>
                                                 )}
-                                            </button>
+                                            </div>
                                         ))}
                                     </div>
                                 )}
@@ -1538,18 +1917,18 @@ function Investigations() {
                     <div className="p-4 space-y-3">
                         {/* Read-only document context — no dropdowns */}
                         {investigationDocuments.length === 0 ? (
-                            <p className="rounded-lg border border-dashed border-neutral-200 px-4 py-5 text-center text-[9px] text-neutral-400">
+                            <p className="rounded-lg border border-dashed border-neutral-200 px-4 py-5 text-center text-xs text-neutral-400">
                                 No documents are attached to this investigation.
                             </p>
                         ) : investigationDocuments.length === 1 ? (
-                            <p className="rounded-lg border border-dashed border-neutral-200 px-4 py-5 text-center text-[9px] text-neutral-400">
+                            <p className="rounded-lg border border-dashed border-neutral-200 px-4 py-5 text-center text-xs text-neutral-400">
                                 Attach at least two documents to enable comparison. Currently attached: <span className="font-medium">{investigationDocuments[0].title}</span>.
                             </p>
                         ) : (
                             <>
                                 {/* Show which documents will be compared (read-only, deterministic) */}
                                 <div className="rounded-lg border border-neutral-100 bg-neutral-50 p-3">
-                                    <p className="mb-2 text-[8px] font-medium uppercase tracking-wide text-neutral-400">
+                                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-400">
                                         Comparing {investigationDocuments.length} attached documents
                                     </p>
                                     <div className="space-y-1">
@@ -1557,11 +1936,11 @@ function Investigations() {
                                             const label = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[index] ?? String(index)
                                             return (
                                                 <div key={doc.id} className="flex items-center gap-2">
-                                                    <span className="shrink-0 rounded bg-neutral-200 px-1.5 py-0.5 text-[8px] font-semibold text-neutral-700">
+                                                    <span className="shrink-0 rounded bg-neutral-200 px-1.5 py-0.5 text-xs font-semibold text-neutral-700">
                                                         {label}
                                                     </span>
-                                                    <span className="truncate text-[9px] text-neutral-700">{doc.title}</span>
-                                                    <span className="shrink-0 text-[8px] text-neutral-400">{doc.filename}</span>
+                                                    <span className="truncate text-xs text-neutral-700">{doc.title}</span>
+                                                    <span className="shrink-0 text-xs text-neutral-400">{doc.filename}</span>
                                                 </div>
                                             )
                                         })}
@@ -1588,11 +1967,11 @@ function Investigations() {
                                                 }}
                                                 rows={2}
                                                 placeholder="e.g. Compare data breach notification requirements, or: Compare these documents."
-                                                className="w-full resize-none bg-transparent text-[11px] leading-5 outline-none placeholder:text-neutral-400"
+                                                className="w-full resize-none bg-transparent text-sm leading-5 outline-none placeholder:text-neutral-400"
                                             />
 
                                             <div className="flex items-center justify-between border-t border-neutral-200 pt-2">
-                                                <span className="text-[8px] text-neutral-400">
+                                                <span className="text-xs text-neutral-400">
                                                     Per-document retrieval · investigation-scoped · {investigationDocuments.length} docs
                                                 </span>
 
@@ -1614,13 +1993,13 @@ function Investigations() {
                                 </div>
 
                                 {compareError && (
-                                    <p className="text-[9px] text-red-500">{compareError}</p>
+                                    <p className="text-xs text-red-500">{compareError}</p>
                                 )}
 
                                 {compareLoading && (
                                     <div className="rounded-xl border border-neutral-100 bg-neutral-50 px-4 py-6 text-center">
                                         <Sparkles size={16} className="mx-auto mb-2 animate-pulse text-neutral-400" />
-                                        <p className="text-[9px] text-neutral-400">Comparing {investigationDocuments.length} documents…</p>
+                                        <p className="text-xs text-neutral-400">Comparing {investigationDocuments.length} documents…</p>
                                     </div>
                                 )}
 
@@ -1653,11 +2032,11 @@ function Investigations() {
                                         <div className="rounded-xl border border-neutral-200 bg-white p-4">
                                             <div className="flex items-center gap-2 mb-3">
                                                 <ShieldAlert size={13} />
-                                                <span className="text-[10px] font-semibold">Comparison Result</span>
-                                                <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[8px] text-neutral-500">AI · grounded · {compareResult.documents.length} docs</span>
+                                                <span className="text-xs font-semibold">Comparison Result</span>
+                                                <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-500">AI · grounded · {compareResult.documents.length} docs</span>
                                             </div>
 
-                                            <div className="space-y-1.5 text-[10px] leading-5 text-neutral-600">
+                                            <div className="space-y-1.5 text-xs leading-5 text-neutral-600">
                                                 {compareResult.comparison.split("\n").map((line, i) => (
                                                     <p key={i}>{line || "\u00A0"}</p>
                                                 ))}
@@ -1671,21 +2050,21 @@ function Investigations() {
                                                 const srcList = compareResult.sources[key] ?? []
                                                 return (
                                                     <div key={doc.id} className="rounded-lg border border-neutral-100 bg-neutral-50 p-3">
-                                                        <p className="mb-2 text-[8px] font-semibold uppercase tracking-wide text-neutral-400">
+                                                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
                                                             Document {doc.label} · {srcList.length} chunk{srcList.length !== 1 ? "s" : ""}
                                                         </p>
                                                         {srcList.length === 0 ? (
-                                                            <p className="text-[8px] text-neutral-400">No relevant chunks found.</p>
+                                                            <p className="text-xs text-neutral-400">No relevant chunks found.</p>
                                                         ) : (
                                                             <div className="space-y-1.5">
                                                                 {srcList.map((src, i) => (
                                                                     <div key={i} className="flex items-center gap-2 rounded-md bg-white border border-neutral-100 p-2">
                                                                         <FileText size={11} className="shrink-0 text-neutral-400" />
                                                                         <div className="min-w-0 flex-1">
-                                                                            <p className="truncate text-[8px] font-medium">{src.document_title}</p>
-                                                                            <p className="text-[7px] text-neutral-400">Chunk {src.chunk}</p>
+                                                                            <p className="truncate text-xs font-medium">{src.document_title}</p>
+                                                                            <p className="text-xs text-neutral-400">Chunk {src.chunk}</p>
                                                                         </div>
-                                                                        <span className="text-[7px] text-neutral-400">{src.distance.toFixed(3)}</span>
+                                                                        <span className="text-xs text-neutral-400">{src.distance.toFixed(3)}</span>
                                                                     </div>
                                                                 ))}
                                                             </div>
@@ -1738,7 +2117,7 @@ function Investigations() {
                     <div className="border-t border-neutral-100 p-3">
                         <div className="flex items-center gap-2 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2.5">
                             <input
-                                className="min-w-0 flex-1 bg-transparent text-[10px] outline-none placeholder:text-neutral-400"
+                                className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-neutral-400"
                                 placeholder="Add a comment to this investigation..."
                             />
 
@@ -1759,7 +2138,7 @@ function Investigations() {
                     <div className="divide-y divide-neutral-100">
                         {loadingInvestigationDocuments ? (
                             <div className="p-5 text-center">
-                                <p className="text-[10px] text-neutral-400">
+                                <p className="text-xs text-neutral-400">
                                     Loading evidence...
                                 </p>
                             </div>
@@ -1770,7 +2149,7 @@ function Investigations() {
                                     className="mx-auto text-neutral-300"
                                 />
 
-                                <p className="mt-2 text-[10px] text-neutral-400">
+                                <p className="mt-2 text-xs text-neutral-400">
                                     No documents are currently available.
                                 </p>
                             </div>
@@ -1789,7 +2168,7 @@ function Investigations() {
 
                     {message && (
                         <div className="border-t border-neutral-100 px-4 py-3">
-                            <p className="text-[9px] text-neutral-500">
+                            <p className="text-xs text-neutral-500">
                                 {message}
                             </p>
                         </div>
@@ -1799,28 +2178,210 @@ function Investigations() {
                 <section className="mt-4 rounded-xl border border-neutral-200 bg-white">
                     <SectionHeader
                         icon={<Sparkles size={14} />}
-                        title="Multi-Agent Execution"
-                        detail="AI work happening inside the investigation"
+                        title="Compliance Investigation Agent"
+                        detail="Analyze the evidence attached to this investigation and produce a structured finding."
                     />
 
-                    <div className="divide-y divide-neutral-100">
-                        <AgentExecution
-                            agent="Regulation Analyst"
-                            action="Comparing applicable regulatory requirements"
-                            status="Completed"
-                        />
+                    <div className="p-4 space-y-3">
+                        <div className="rounded-lg border border-neutral-100 bg-neutral-50 p-3">
+                            <p className="text-xs font-medium uppercase tracking-wide text-neutral-400 mb-2">
+                                Investigation Scope
+                            </p>
+                            <p className="text-xs text-neutral-600">
+                                The agent will analyze all {investigationDocuments.length} document{investigationDocuments.length !== 1 ? 's' : ''} currently attached to this investigation.
+                            </p>
+                        </div>
 
-                        <AgentExecution
-                            agent="Evidence Analyst"
-                            action="Reviewing supporting documents"
-                            status="Running"
-                        />
+                        <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
+                            <div className="flex gap-3">
+                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-neutral-900 text-white">
+                                    <Sparkles size={14} />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <textarea
+                                        id="agent-question"
+                                        value={agentQuestion}
+                                        onChange={(e) => setAgentQuestion(e.target.value)}
+                                        rows={3}
+                                        placeholder="e.g. Determine if our data retention policy complies with GDPR Article 5."
+                                        className="w-full resize-none bg-transparent text-sm leading-5 outline-none placeholder:text-neutral-400"
+                                    />
+                                    <div className="flex items-center justify-between border-t border-neutral-200 pt-2">
+                                        <span className="text-xs text-neutral-400">
+                                            Agent execution may take a few moments
+                                        </span>
+                                        <button
+                                            id="agent-submit"
+                                            onClick={runAgent}
+                                            disabled={agentLoading || !agentQuestion.trim()}
+                                            className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                                        >
+                                            {agentLoading ? "Running..." : "Run Investigation"}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
-                        <AgentExecution
-                            agent="Risk Analyst"
-                            action="Evaluating potential compliance impact"
-                            status="Queued"
-                        />
+                        {agentError && (
+                            <p className="text-xs text-red-500">{agentError}</p>
+                        )}
+
+                        {agentLoading && (
+                            <div className="rounded-xl border border-neutral-100 bg-neutral-50 px-4 py-6 text-center">
+                                <Sparkles size={16} className="mx-auto mb-2 animate-pulse text-neutral-400" />
+                                <p className="text-xs text-neutral-400">The agent is analyzing documents and preparing a finding...</p>
+                            </div>
+                        )}
+
+                        {agentRuns.length > 0 && (
+                            <div className="mt-6">
+                                <div className="mb-3 flex items-center justify-between">
+                                    <h3 className="text-xs font-semibold">Agent Run History</h3>
+                                    <span className="text-xs text-neutral-400">{agentRuns.length} run{agentRuns.length !== 1 ? 's' : ''}</span>
+                                </div>
+                                
+                                <div className="flex flex-col gap-3">
+                                    {agentRuns.map((run) => (
+                                        <div key={run.id} className="rounded-xl border border-neutral-200 overflow-hidden bg-white">
+                                            <button
+                                                type="button" 
+                                                className="w-full text-left p-3 bg-neutral-50 border-b border-neutral-100 cursor-pointer hover:bg-neutral-100 transition block"
+                                                onClick={() => setExpandedAgentRunId(expandedAgentRunId === run.id ? null : run.id)}
+                                            >
+                                                <div className="flex justify-between items-start gap-3">
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="text-xs font-semibold text-neutral-700">{run.question}</p>
+                                                        {expandedAgentRunId !== run.id && (
+                                                            <p className="mt-1 text-xs text-neutral-500 line-clamp-1">{run.finding}</p>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex flex-col items-end shrink-0">
+                                                        <span className="text-xs text-neutral-400">{new Date(run.created_at).toLocaleString()}</span>
+                                                        <span className="mt-1 rounded bg-neutral-200 px-1.5 py-0.5 text-xs font-semibold text-neutral-700">{run.status}</span>
+                                                    </div>
+                                                </div>
+                                            </button>
+
+                                            {expandedAgentRunId === run.id && (
+                                                <div className="p-4 space-y-5">
+                                                    <div>
+                                                        <h4 className="text-xs uppercase tracking-wider text-neutral-400 font-semibold mb-2">Finding</h4>
+                                                        <div className="border-t border-neutral-100 pt-2">
+                                                            <p className="text-xs leading-5 text-neutral-700 whitespace-pre-wrap">{run.finding}</p>
+                                                        </div>
+                                                    </div>
+
+                                                    {run.evidence && run.evidence.length > 0 && (
+                                                        <div>
+                                                            <h4 className="text-xs uppercase tracking-wider text-neutral-400 font-semibold mb-2">Evidence</h4>
+                                                            <div className="grid gap-2 border-t border-neutral-100 pt-2">
+                                                                {run.evidence.map((ev, i) => (
+                                                                    <div key={i} className="rounded-lg border border-neutral-100 bg-neutral-50 p-2.5">
+                                                                        <div className="flex items-center gap-2 mb-1.5">
+                                                                            <FileText size={11} className="text-neutral-400" />
+                                                                            <span className="text-xs font-medium text-neutral-700 truncate">{ev.document_title}</span>
+                                                                        </div>
+                                                                        <p className="text-xs text-neutral-600 italic">"{ev.text_snippet}"</p>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {run.applicable_requirements && run.applicable_requirements.length > 0 && (
+                                                        <div>
+                                                            <h4 className="text-xs uppercase tracking-wider text-neutral-400 font-semibold mb-2">Applicable Requirements</h4>
+                                                            <div className="space-y-1.5 border-t border-neutral-100 pt-2">
+                                                                {run.applicable_requirements.map((req, i) => (
+                                                                    <div key={i} className="flex gap-2">
+                                                                        <CheckCircle2 size={12} className="text-neutral-500 shrink-0 mt-0.5" />
+                                                                        <div>
+                                                                            <p className="text-xs text-neutral-700">{req.requirement}</p>
+                                                                            <p className="text-xs text-neutral-400">Source: {req.source_document}</p>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {run.citations && run.citations.length > 0 && (
+                                                        <div>
+                                                            <h4 className="text-xs uppercase tracking-wider text-neutral-400 font-semibold mb-2">Citations</h4>
+                                                            <div className="grid gap-2 border-t border-neutral-100 pt-2">
+                                                                {run.citations.map((cit, i) => {
+                                                                    const docTitle = run.evidence?.find((e) => e.document_id === cit.document_id)?.document_title || `Document ID ${cit.document_id}`
+                                                                    return (
+                                                                        <div key={i} className="rounded-lg border border-neutral-100 bg-neutral-50 p-2.5">
+                                                                            <div className="flex items-center gap-2 mb-1.5">
+                                                                                <FileText size={11} className="text-neutral-400" />
+                                                                                <span className="text-xs font-medium text-neutral-700 truncate">{docTitle} (Chunk {cit.chunk})</span>
+                                                                            </div>
+                                                                            <p className="text-xs text-neutral-600 italic">"{cit.text}"</p>
+                                                                        </div>
+                                                                    )
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {run.conflicts && run.conflicts.length > 0 && (
+                                                        <div>
+                                                            <h4 className="text-xs uppercase tracking-wider text-red-400 font-semibold mb-2">Conflicts</h4>
+                                                            <div className="space-y-2 border-t border-red-100 pt-2">
+                                                                {run.conflicts.map((conf, i) => (
+                                                                    <div key={i} className="rounded-lg border border-red-100 bg-red-50 p-2.5">
+                                                                        <div className="flex items-start gap-2">
+                                                                            <ShieldAlert size={12} className="text-red-500 shrink-0 mt-0.5" />
+                                                                            <div>
+                                                                                <p className="text-xs text-red-700 font-medium">{conf.description}</p>
+                                                                                <p className="mt-1 text-xs text-red-500">Between: {conf.conflicting_documents.join(" and ")}</p>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {run.evidence_gaps && run.evidence_gaps.length > 0 && (
+                                                        <div>
+                                                            <h4 className="text-xs uppercase tracking-wider text-amber-500 font-semibold mb-2">Evidence Gaps</h4>
+                                                            <div className="space-y-2 border-t border-amber-100 pt-2">
+                                                                {run.evidence_gaps.map((gap, i) => (
+                                                                    <div key={i} className="rounded-lg border border-amber-200 bg-amber-50 p-2.5">
+                                                                        <p className="text-xs text-amber-800 font-medium">Missing: {gap.missing_information}</p>
+                                                                        <p className="mt-1 text-xs text-amber-700">Impact: {gap.impact_on_investigation}</p>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {run.suggested_actions && run.suggested_actions.length > 0 && (
+                                                        <div>
+                                                            <h4 className="text-xs uppercase tracking-wider text-neutral-400 font-semibold mb-2">Suggested Actions</h4>
+                                                            <div className="space-y-2 border-t border-neutral-100 pt-2">
+                                                                {run.suggested_actions.map((act, i) => (
+                                                                    <div key={i} className="rounded-lg border border-neutral-200 bg-white p-2.5 flex items-start gap-2">
+                                                                        <Activity size={12} className="text-neutral-500 shrink-0 mt-0.5" />
+                                                                        <div>
+                                                                            <p className="text-xs font-medium text-neutral-800">{act.action}</p>
+                                                                            <p className="text-xs text-neutral-500">{act.reason}</p>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </section>
             </section>
@@ -1858,17 +2419,17 @@ function Investigations() {
                     >
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-[10px] font-medium">
+                                <p className="text-xs font-medium">
                                     Review required
                                 </p>
 
-                                <p className="mt-1 text-[9px] leading-4 text-neutral-400">
+                                <p className="mt-1 text-xs leading-4 text-neutral-400">
                                     A human decision is required before the
                                     recommendation can be finalized.
                                 </p>
                             </div>
 
-                            <button className="ml-3 shrink-0 rounded-md border border-neutral-200 px-2 py-1.5 text-[9px] text-neutral-500 hover:bg-neutral-50">
+                            <button className="ml-3 shrink-0 rounded-md border border-neutral-200 px-2 py-1.5 text-xs text-neutral-500 hover:bg-neutral-50">
                                 Review
                             </button>
                         </div>
@@ -1884,12 +2445,12 @@ function Investigations() {
                                     Medium
                                 </p>
 
-                                <p className="mt-1 text-[9px] text-neutral-400">
+                                <p className="mt-1 text-xs text-neutral-400">
                                     Preliminary assessment
                                 </p>
                             </div>
 
-                            <span className="text-[9px] text-neutral-400">
+                            <span className="text-xs text-neutral-400">
                                 62 / 100
                             </span>
                         </div>
@@ -1903,12 +2464,12 @@ function Investigations() {
                         title="Governance Recommendation"
                         icon={<CheckCircle2 size={13} />}
                     >
-                        <p className="text-[10px] font-medium leading-5">
+                        <p className="text-xs font-medium leading-5">
                             Review and formalize retention periods for
                             employee data categories.
                         </p>
 
-                        <p className="mt-2 text-[9px] leading-4 text-neutral-400">
+                        <p className="mt-2 text-xs leading-4 text-neutral-400">
                             Recommendation remains subject to human review and
                             supporting evidence validation.
                         </p>
@@ -1950,12 +2511,12 @@ function Investigations() {
                             <Avatar initials="AS" />
                             <Avatar initials="RK" />
 
-                            <span className="ml-1 text-[9px] text-neutral-400">
+                            <span className="ml-1 text-xs text-neutral-400">
                                 3 people active
                             </span>
                         </div>
 
-                        <p className="mt-3 text-[9px] leading-4 text-neutral-400">
+                        <p className="mt-3 text-xs leading-4 text-neutral-400">
                             Changes, comments and agent activity are shared
                             with investigation participants.
                         </p>
@@ -1982,13 +2543,173 @@ function Investigations() {
                     role="status"
                     aria-live="polite"
                 >
-                    <div className="rounded-lg border border-neutral-200 bg-white px-4 py-2.5 text-[10px] font-medium text-neutral-700 shadow-lg">
+                    <div className="rounded-lg border border-neutral-200 bg-white px-4 py-2.5 text-xs font-medium text-neutral-700 shadow-lg">
                         File already exists
+                    </div>
+                </div>
+            )}
+
+            {editInvestigationId && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+                    <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">
+                        <h2 className="text-base font-semibold">Edit Investigation</h2>
+                        <div className="mt-4 space-y-3">
+                            <div>
+                                <label className="block text-xs font-medium text-neutral-700">Title</label>
+                                <input
+                                    value={editInvestigationTitle}
+                                    onChange={(e) => setEditInvestigationTitle(e.target.value)}
+                                    className="mt-1 w-full rounded-md border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-neutral-400"
+                                    placeholder="Investigation title"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-neutral-700">Description</label>
+                                <textarea
+                                    value={editInvestigationDescription}
+                                    onChange={(e) => setEditInvestigationDescription(e.target.value)}
+                                    rows={3}
+                                    className="mt-1 w-full resize-none rounded-md border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-neutral-400"
+                                    placeholder="Optional description"
+                                />
+                            </div>
+                        </div>
+                        <div className="mt-6 flex items-center justify-end gap-3">
+                            <button
+                                onClick={() => setEditInvestigationId(null)}
+                                className="rounded-md px-3 py-1.5 text-sm font-medium text-neutral-600 hover:bg-neutral-100"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={updateInvestigation}
+                                disabled={editingInvestigation || !editInvestigationTitle.trim()}
+                                className="rounded-md bg-neutral-900 px-4 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+                            >
+                                {editingInvestigation ? "Saving..." : "Save Changes"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {deleteInvestigationId && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+                    <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-2xl">
+                        <h2 className="text-base font-semibold text-red-600">Delete Investigation?</h2>
+                        <p className="mt-2 text-sm leading-relaxed text-neutral-600">
+                            Are you sure you want to delete this investigation? This action cannot be undone. Underlying documents will remain in your workspace.
+                        </p>
+                        <div className="mt-6 flex items-center justify-end gap-3">
+                            <button
+                                onClick={() => setDeleteInvestigationId(null)}
+                                className="rounded-md px-3 py-1.5 text-sm font-medium text-neutral-600 hover:bg-neutral-100"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={deleteInvestigation}
+                                disabled={deletingInvestigation}
+                                className="rounded-md bg-red-600 px-4 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+                            >
+                                {deletingInvestigation ? "Deleting..." : "Delete Permanently"}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
         </div>
     )
+            {shareModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
+                        <div className="mb-6">
+                            <h2 className="text-lg font-semibold text-neutral-900">Share to Public Knowledge</h2>
+                            <p className="mt-1 text-xs text-neutral-500">Publish this finding for all users in the organization to see.</p>
+                        </div>
+                        
+                        <div className="space-y-4">
+                            <div>
+                                <label className="mb-1 block text-xs font-medium text-neutral-700">Title <span className="text-red-500">*</span></label>
+                                <input
+                                    type="text"
+                                    value={shareTitle}
+                                    onChange={(e) => setShareTitle(e.target.value)}
+                                    className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-xs outline-none focus:border-neutral-400"
+                                    placeholder="Enter a descriptive title"
+                                />
+                            </div>
+                            
+                            <div>
+                                <label className="mb-1 block text-xs font-medium text-neutral-700">Content <span className="text-red-500">*</span></label>
+                                <textarea
+                                    value={shareContent}
+                                    onChange={(e) => setShareContent(e.target.value)}
+                                    rows={5}
+                                    className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-xs outline-none focus:border-neutral-400"
+                                    placeholder="Detailed finding or insight"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="mb-1 block text-xs font-medium text-neutral-700">Source / Citation</label>
+                                <input
+                                    type="text"
+                                    value={shareSource}
+                                    onChange={(e) => setShareSource(e.target.value)}
+                                    className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-xs outline-none focus:border-neutral-400"
+                                    placeholder="e.g. Document ABC or Agent Analysis"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="mt-8 flex justify-end gap-3">
+                            <button
+                                onClick={() => setShareModalOpen(false)}
+                                className="rounded-lg border border-neutral-200 px-4 py-2 text-xs font-medium text-neutral-600 transition hover:bg-neutral-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    if (!shareTitle || !shareContent) return
+                                    setSharingKnowledge(true)
+                                    try {
+                                        const token = localStorage.getItem("token")
+                                        const res = await fetch("/api/v1/knowledge/", {
+                                            method: "POST",
+                                            headers: {
+                                                "Content-Type": "application/json",
+                                                Authorization: `Bearer ${token}`
+                                            },
+                                            body: JSON.stringify({
+                                                title: shareTitle,
+                                                content: shareContent,
+                                                source_citation: shareSource,
+                                                investigation_id: selectedInvestigation?.id
+                                            })
+                                        })
+                                        if (res.ok) {
+                                            setMessage("Finding successfully published to Public Knowledge.")
+                                            setShareModalOpen(false)
+                                        } else {
+                                            setMessage("Failed to share finding.")
+                                        }
+                                    } catch (err) {
+                                        console.error(err)
+                                    } finally {
+                                        setSharingKnowledge(false)
+                                    }
+                                }}
+                                disabled={sharingKnowledge || !shareTitle || !shareContent}
+                                className="rounded-lg bg-neutral-900 px-4 py-2 text-xs font-medium text-white transition hover:bg-neutral-800 disabled:opacity-50"
+                            >
+                                {sharingKnowledge ? "Publishing..." : "Publish Finding"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 }
 
 function DocumentPreviewModal({
@@ -2007,8 +2728,8 @@ function DocumentPreviewModal({
             <div className="flex h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
                 <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-3">
                     <div className="min-w-0">
-                        <p className="truncate text-[11px] font-semibold">{document.title}</p>
-                        <p className="mt-0.5 truncate text-[8px] text-neutral-400">{document.filename}</p>
+                        <p className="truncate text-sm font-semibold">{document.title}</p>
+                        <p className="mt-0.5 truncate text-xs text-neutral-400">{document.filename}</p>
                     </div>
                     <button
                         type="button"
@@ -2021,7 +2742,7 @@ function DocumentPreviewModal({
 
                 <div className="min-h-0 flex-1 bg-neutral-100">
                     {loading ? (
-                        <div className="flex h-full items-center justify-center text-[10px] text-neutral-400">
+                        <div className="flex h-full items-center justify-center text-xs text-neutral-400">
                             Loading preview...
                         </div>
                     ) : url ? (
@@ -2031,7 +2752,7 @@ function DocumentPreviewModal({
                             className="h-full w-full border-0"
                         />
                     ) : (
-                        <div className="flex h-full items-center justify-center p-6 text-center text-[10px] text-neutral-400">
+                        <div className="flex h-full items-center justify-center p-6 text-center text-xs text-neutral-400">
                             Preview is not available for this document.
                         </div>
                     )}
@@ -2056,9 +2777,9 @@ function SectionHeader({
                 <span className="text-neutral-500">{icon}</span>
 
                 <div>
-                    <h2 className="text-[11px] font-semibold">{title}</h2>
+                    <h2 className="text-sm font-semibold">{title}</h2>
 
-                    <p className="mt-0.5 text-[8px] text-neutral-400">
+                    <p className="mt-0.5 text-xs text-neutral-400">
                         {detail}
                     </p>
                 </div>
@@ -2080,13 +2801,13 @@ function ComparisonCard({
 }) {
     return (
         <div className="rounded-lg border border-neutral-200 p-3">
-            <p className="text-[8px] uppercase tracking-[0.12em] text-neutral-400">
+            <p className="text-xs uppercase tracking-[0.12em] text-neutral-400">
                 {label}
             </p>
 
-            <p className="mt-2 text-[10px] font-semibold">{title}</p>
+            <p className="mt-2 text-xs font-semibold">{title}</p>
 
-            <p className="mt-2 text-[9px] leading-4 text-neutral-500">
+            <p className="mt-2 text-xs leading-4 text-neutral-500">
                 {text}
             </p>
         </div>
@@ -2111,7 +2832,7 @@ function Comment({
     return (
         <div className="flex gap-3 p-4">
             <div
-                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[8px] font-medium ${ai
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-medium ${ai
                     ? "bg-neutral-900 text-white"
                     : "bg-neutral-100 text-neutral-600"
                     }`}
@@ -2121,20 +2842,20 @@ function Comment({
 
             <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                    <p className="text-[10px] font-medium">{name}</p>
+                    <p className="text-xs font-medium">{name}</p>
 
-                    <span className="text-[8px] text-neutral-400">
+                    <span className="text-xs text-neutral-400">
                         {role}
                     </span>
 
-                    <span className="text-[8px] text-neutral-300">•</span>
+                    <span className="text-xs text-neutral-300">•</span>
 
-                    <span className="text-[8px] text-neutral-400">
+                    <span className="text-xs text-neutral-400">
                         {time}
                     </span>
                 </div>
 
-                <p className="mt-2 text-[9px] leading-4 text-neutral-500">
+                <p className="mt-2 text-xs leading-4 text-neutral-500">
                     {text}
                 </p>
             </div>
@@ -2160,11 +2881,11 @@ function EvidenceRow({
             </div>
 
             <div className="min-w-0 flex-1">
-                <p className="truncate text-[10px] font-medium">
+                <p className="truncate text-xs font-medium">
                     {document.title}
                 </p>
 
-                <p className="mt-1 truncate text-[8px] text-neutral-400">
+                <p className="mt-1 truncate text-xs text-neutral-400">
                     {document.filename} · {document.document_type} ·{" "}
                     {document.jurisdiction}
                 </p>
@@ -2173,7 +2894,7 @@ function EvidenceRow({
             <div className="flex shrink-0 items-center gap-2">
                 <div className="text-right">
                     <span
-                        className={`rounded-full px-2 py-1 text-[8px] ${document.processing_status === "Ready"
+                        className={`rounded-full px-2 py-1 text-xs ${document.processing_status === "Ready"
                             ? "bg-neutral-100 text-neutral-600"
                             : "bg-neutral-50 text-neutral-400"
                             }`}
@@ -2182,7 +2903,7 @@ function EvidenceRow({
                     </span>
 
                     {document.chunks > 0 && (
-                        <p className="mt-1 text-[8px] text-neutral-400">
+                        <p className="mt-1 text-xs text-neutral-400">
                             {document.embedded_chunks}/{document.chunks} chunks
                         </p>
                     )}
@@ -2211,38 +2932,7 @@ function EvidenceRow({
     )
 }
 
-function AgentExecution({
-    agent,
-    action,
-    status,
-}: {
-    agent: string
-    action: string
-    status: string
-}) {
-    const running = status === "Running"
 
-    return (
-        <div className="flex items-center gap-3 px-4 py-3">
-            <div
-                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${running ? "bg-neutral-900 text-white" : "bg-neutral-100"
-                    }`}
-            >
-                <Sparkles size={12} />
-            </div>
-
-            <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-medium">{agent}</p>
-
-                <p className="mt-0.5 truncate text-[9px] text-neutral-400">
-                    {action}
-                </p>
-            </div>
-
-            <span className="text-[8px] text-neutral-400">{status}</span>
-        </div>
-    )
-}
 
 function InsightPanel({
     title,
@@ -2258,7 +2948,7 @@ function InsightPanel({
             <div className="mb-3 flex items-center gap-2 border-b border-neutral-100 pb-3">
                 <span className="text-neutral-500">{icon}</span>
 
-                <h2 className="text-[10px] font-semibold">{title}</h2>
+                <h2 className="text-xs font-semibold">{title}</h2>
             </div>
 
             {children}
@@ -2283,11 +2973,12 @@ function AgentStatus({
             />
 
             <div className="min-w-0 flex-1">
-                <p className="text-[9px] font-medium">{name}</p>
+                <p className="text-xs font-medium">{name}</p>
 
-                <p className="mt-0.5 text-[8px] text-neutral-400">
+                <p className="mt-0.5 text-xs text-neutral-400">
                     {detail}
                 </p>
+
             </div>
         </div>
     )
@@ -2302,16 +2993,16 @@ function TraceRow({
 }) {
     return (
         <div className="flex items-start gap-2.5">
-            <span className="text-[8px] text-neutral-300">{number}</span>
+            <span className="text-xs text-neutral-300">{number}</span>
 
-            <p className="text-[9px] leading-4 text-neutral-500">{text}</p>
+            <p className="text-xs leading-4 text-neutral-500">{text}</p>
         </div>
     )
 }
 
 function Avatar({ initials }: { initials: string }) {
     return (
-        <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-neutral-200 text-[7px] font-medium text-neutral-600">
+        <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-neutral-200 text-xs font-medium text-neutral-600">
             {initials}
         </div>
     )
