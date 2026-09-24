@@ -210,7 +210,7 @@ function AttachModal({
                     <button
                         onClick={handleAttach}
                         disabled={!selectedDoc || !selectedInv || saving}
-                        className="rounded-lg bg-neutral-900 px-4 py-1.5 text-xs text-white disabled:opacity-40 hover:bg-neutral-700"
+                        className="rounded-full bg-neutral-900 px-4 py-1.5 text-xs text-white disabled:opacity-40 hover:bg-neutral-700"
                     >
                         {saving ? "Attaching…" : "Attach"}
                     </button>
@@ -363,7 +363,7 @@ function ShareToInvestigationModal({
                     <button
                         onClick={handleShare}
                         disabled={!selectedInv || saving || result?.ok === true}
-                        className="rounded-lg bg-neutral-900 px-4 py-1.5 text-xs text-white disabled:opacity-40 hover:bg-neutral-700"
+                        className="rounded-full bg-neutral-900 px-4 py-1.5 text-xs text-white disabled:opacity-40 hover:bg-neutral-700"
                     >
                         {saving ? "Sharing…" : "Share"}
                     </button>
@@ -634,7 +634,7 @@ function Research() {
                                 <button
                                     onClick={askRag}
                                     disabled={ragLoading || !question.trim()}
-                                    className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-900 text-white disabled:cursor-not-allowed disabled:opacity-30"
+                                    className="flex h-8 w-8 items-center justify-center rounded-full bg-[#FBC648] text-neutral-900 disabled:cursor-not-allowed disabled:opacity-30"
                                 >
                                     {ragLoading ? (
                                         <Sparkles size={13} className="animate-pulse" />

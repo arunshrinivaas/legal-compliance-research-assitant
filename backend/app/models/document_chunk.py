@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import ForeignKey, Integer, Text
+from sqlalchemy import ForeignKey, Integer, Text, Index
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -35,4 +35,14 @@ class DocumentChunk(Base):
     created_at: Mapped[datetime | None] = mapped_column(
         nullable=True,
         server_default="CURRENT_TIMESTAMP",
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_document_chunks_embedding",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_with={"m": 16, "ef_construction": 64},
+            postgresql_ops={"embedding": "vector_cosine_ops"},
+        ),
     )

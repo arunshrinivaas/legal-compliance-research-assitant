@@ -254,7 +254,7 @@ export default function Agents() {
                             className={`absolute bottom-3 right-3 flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${
                                 isRunning || !selectedInvestigation || !question.trim() || documentsCount === 0
                                     ? "bg-neutral-100 text-neutral-400 cursor-not-allowed"
-                                    : "bg-neutral-900 text-white hover:bg-neutral-800 shadow-sm"
+                                    : "bg-[#FBC648] text-neutral-900 hover:bg-[#FBC648]/90 shadow-sm"
                             }`}
                         >
                             {isRunning ? (

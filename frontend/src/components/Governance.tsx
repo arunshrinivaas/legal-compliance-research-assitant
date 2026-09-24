@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { SegmentedControl } from "./SegmentedControl"
 import {
     AlertTriangle,
     BookOpen,
@@ -409,21 +410,12 @@ function Governance() {
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-1 rounded-lg border border-neutral-200 bg-neutral-50 p-1 w-fit">
-                {tabs.map((tab) => (
-                    <button
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
-                        className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
-                            activeTab === tab.id
-                                ? "bg-white text-neutral-900 shadow-sm"
-                                : "text-neutral-500 hover:text-neutral-700"
-                        }`}
-                    >
-                        {tab.label}
-                    </button>
-                ))}
-            </div>
+            <SegmentedControl
+                options={tabs.map(t => ({ value: t.id, label: t.label }))}
+                value={activeTab}
+                onChange={v => setActiveTab(v as Tab)}
+                size="sm"
+            />
 
             {/* ---------------------------------------------------------------- */}
             {/* OVERVIEW TAB                                                      */}
@@ -448,7 +440,7 @@ function Governance() {
             {activeTab === "policies" && (
                 <div className="space-y-3">
                     <div className="flex flex-wrap items-center gap-2">
-                        <div className="flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5">
+                        <div className="search-pill flex items-center gap-1.5 px-2.5 py-1.5">
                             <Search size={12} className="text-neutral-400" />
                             <input
                                 value={policySearch}
@@ -534,7 +526,7 @@ function Governance() {
                             <option value="Draft">Draft</option>
                             <option value="Archived">Archived</option>
                         </select>
-                        <div className="flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5">
+                        <div className="search-pill flex items-center gap-1.5 px-2.5 py-1.5">
                             <Search size={12} className="text-neutral-400" />
                             <input
                                 value={regJurisdictionFilter}

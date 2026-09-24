@@ -1228,7 +1228,7 @@ function Investigations() {
                                         <button
                                             onClick={createInvestigation}
                                             disabled={creatingInvestigation || !newTitle.trim()}
-                                            className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs text-white disabled:cursor-not-allowed disabled:opacity-30"
+                                            className="rounded-full bg-neutral-900 px-4 py-1.5 text-xs text-white disabled:cursor-not-allowed disabled:opacity-30"
                                         >
                                             {creatingInvestigation ? "Creating..." : "Create investigation"}
                                         </button>
@@ -1652,7 +1652,7 @@ function Investigations() {
                                             <button
                                                 onClick={createInvestigation}
                                                 disabled={creatingInvestigation || !newTitle.trim()}
-                                                className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs text-white disabled:cursor-not-allowed disabled:opacity-30"
+                                                className="rounded-full bg-neutral-900 px-4 py-1.5 text-xs text-white disabled:cursor-not-allowed disabled:opacity-30"
                                             >
                                                 {creatingInvestigation ? "Creating..." : "Create"}
                                             </button>
@@ -1718,7 +1718,7 @@ function Investigations() {
                                                 !question.trim() ||
                                                 !selectedInvestigation
                                             }
-                                            className="flex h-7 w-7 items-center justify-center rounded-full bg-neutral-900 text-white disabled:cursor-not-allowed disabled:opacity-30"
+                                            className="flex h-7 w-7 items-center justify-center rounded-full bg-[#FBC648] text-neutral-900 disabled:cursor-not-allowed disabled:opacity-30 hover:bg-[#FBC648]/90"
                                         >
                                             {ragLoading ? (
                                                 <Sparkles size={12} />
@@ -1979,7 +1979,7 @@ function Investigations() {
                                                     id="compare-submit"
                                                     onClick={runComparison}
                                                     disabled={compareLoading || !compareQuestion.trim()}
-                                                    className="flex h-7 w-7 items-center justify-center rounded-full bg-neutral-900 text-white disabled:cursor-not-allowed disabled:opacity-30"
+                                                    className="flex h-7 w-7 items-center justify-center rounded-full bg-[#FBC648] text-neutral-900 disabled:cursor-not-allowed disabled:opacity-30 hover:bg-[#FBC648]/90"
                                                 >
                                                     {compareLoading ? (
                                                         <Sparkles size={12} />
@@ -2121,7 +2121,7 @@ function Investigations() {
                                 placeholder="Add a comment to this investigation..."
                             />
 
-                            <button className="flex h-7 w-7 items-center justify-center rounded-md bg-neutral-900 text-white">
+                            <button className="flex h-7 w-7 items-center justify-center rounded-full bg-neutral-900 text-white">
                                 <ChevronRight size={13} />
                             </button>
                         </div>
@@ -2214,7 +2214,7 @@ function Investigations() {
                                             id="agent-submit"
                                             onClick={runAgent}
                                             disabled={agentLoading || !agentQuestion.trim()}
-                                            className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                                            className="rounded-full bg-[#FBC648] px-4 py-1.5 text-xs font-medium text-neutral-900 disabled:opacity-40 disabled:cursor-not-allowed"
                                         >
                                             {agentLoading ? "Running..." : "Run Investigation"}
                                         </button>
@@ -2584,7 +2584,7 @@ function Investigations() {
                             <button
                                 onClick={updateInvestigation}
                                 disabled={editingInvestigation || !editInvestigationTitle.trim()}
-                                className="rounded-md bg-neutral-900 px-4 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+                                className="rounded-full bg-neutral-900 px-4 py-1.5 text-sm font-medium text-white disabled:opacity-50"
                             >
                                 {editingInvestigation ? "Saving..." : "Save Changes"}
                             </button>
@@ -2702,7 +2702,7 @@ function Investigations() {
                                     }
                                 }}
                                 disabled={sharingKnowledge || !shareTitle || !shareContent}
-                                className="rounded-lg bg-neutral-900 px-4 py-2 text-xs font-medium text-white transition hover:bg-neutral-800 disabled:opacity-50"
+                                className="rounded-full bg-neutral-900 px-4 py-2 text-xs font-medium text-white transition hover:bg-neutral-800 disabled:opacity-50"
                             >
                                 {sharingKnowledge ? "Publishing..." : "Publish Finding"}
                             </button>

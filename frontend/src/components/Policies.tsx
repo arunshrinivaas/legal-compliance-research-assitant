@@ -19,14 +19,20 @@ type LoadState = "loading" | "empty" | "error" | "ok"
 const STATUS_OPTIONS = ["Draft", "Active", "Under Review", "Archived", "Deprecated"]
 
 function statusBadge(status: string) {
-    const map: Record<string, string> = {
-        Active: "bg-green-50 text-green-700 border-green-200",
-        Draft: "bg-amber-50 text-amber-700 border-amber-200",
-        "Under Review": "bg-blue-50 text-blue-600 border-blue-200",
-        Archived: "bg-neutral-100 text-neutral-500 border-neutral-200",
-        Deprecated: "bg-red-50 text-red-600 border-red-200",
-    }
-    return map[status] ?? "bg-neutral-100 text-neutral-600 border-neutral-200"
+    let colorClass = "status-progress"
+    if (status === "Active") colorClass = "status-compliant"
+    if (status === "Draft" || status === "Under Review") colorClass = "status-progress"
+    if (status === "Deprecated") colorClass = "status-non-compliant"
+    if (status === "Archived") colorClass = "status-risk"
+
+    return (
+        <div className="status-dot-wrapper group" title={status}>
+            <div className="status-dot-container">
+                <div className={`status-dot ${colorClass}`} />
+                <span className="status-label">{status}</span>
+            </div>
+        </div>
+    )
 }
 
 function PolicyFormModal({
@@ -243,16 +249,16 @@ function PolicyCard({
                     <FileText size={14} className="text-neutral-500" />
                 </div>
                 <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-semibold text-neutral-900">{policy.title}</p>
-                        <span
-                            className={`rounded-full border px-2 py-0.5 text-xs font-medium ${statusBadge(policy.status)}`}
-                        >
-                            {policy.status}
-                        </span>
-                        <span className="rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-xs text-neutral-500">
-                            v{policy.version}
-                        </span>
+                    <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0 flex-1 flex items-center gap-2 flex-wrap">
+                            <p className="text-sm font-semibold text-neutral-900 truncate">{policy.title}</p>
+                            <span className="rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-[10px] text-neutral-500 uppercase tracking-wider">
+                                v{policy.version}
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0 h-5">
+                            {statusBadge(policy.status)}
+                        </div>
                     </div>
                     <div className="mt-1 flex items-center gap-3 text-xs text-neutral-400 flex-wrap">
                         <span>{policy.department}</span>
@@ -376,7 +382,7 @@ function Policies() {
 
             {/* Filters */}
             <div className="flex shrink-0 items-center gap-3 border-b border-neutral-100 px-6 py-3">
-                <div className="flex flex-1 items-center gap-2 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2">
+                <div className="search-pill flex flex-1 items-center gap-2 px-3 py-2">
                     <Search size={12} className="text-neutral-400" />
                     <input
                         value={search}

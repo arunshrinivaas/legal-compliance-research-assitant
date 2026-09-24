@@ -17,6 +17,7 @@ from app.routers import (
     research,
     knowledge,
     workspace,
+    help,
 )
 
 
@@ -53,6 +54,7 @@ app.include_router(knowledge.router)
 app.include_router(workspace.router)
 app.include_router(audit.router)
 app.include_router(governance.router)
+app.include_router(help.router)
 
 
 @app.get("/")

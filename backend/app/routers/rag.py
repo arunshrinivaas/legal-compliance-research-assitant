@@ -87,12 +87,21 @@ async def ask_rag(
 
     print(f"[DIAG] Calling answer_with_rag with document_ids={list(document_ids) if document_ids is not None else None!r}")
 
-    result = await answer_with_rag(
-        db=db,
-        question=request.question,
-        limit=request.limit,
-        document_ids=document_ids,
-    )
+    try:
+        result = await answer_with_rag(
+            db=db,
+            question=request.question,
+            limit=request.limit,
+            document_ids=document_ids,
+        )
+    except RuntimeError as e:
+        if "Copilot API failed:" in str(e):
+            print(f"[ERROR] Copilot generation failed: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="The AI assistant service is currently unavailable or timed out.",
+            )
+        raise
 
     print(f"[DIAG] answer_with_rag returned sources count = {len(result['sources'])}")
     for s in result["sources"]:

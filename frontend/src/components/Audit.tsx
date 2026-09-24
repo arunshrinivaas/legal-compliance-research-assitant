@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { SegmentedControl } from "./SegmentedControl"
 import {
     CheckCircle,
     Clock,
@@ -105,12 +106,19 @@ function fmtDate(ts: string) {
 }
 
 function statusBadge(status: string) {
-    const base = "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
-    if (status === "completed")
-        return <span className={`${base} bg-green-50 text-green-700`}><CheckCircle size={9} />Completed</span>
-    if (status === "failed")
-        return <span className={`${base} bg-red-50 text-red-600`}><XCircle size={9} />Failed</span>
-    return <span className={`${base} bg-amber-50 text-amber-600`}><Clock size={9} />Pending</span>
+    let colorClass = "status-progress"
+    let label = "Pending"
+    if (status === "completed") { colorClass = "status-compliant"; label = "Completed"; }
+    if (status === "failed") { colorClass = "status-non-compliant"; label = "Failed"; }
+
+    return (
+        <div className="status-dot-wrapper group" title={label}>
+            <div className="status-dot-container">
+                <div className={`status-dot ${colorClass}`} />
+                <span className="status-label">{label}</span>
+            </div>
+        </div>
+    )
 }
 
 function eventTypeIcon(type: string) {
@@ -482,21 +490,15 @@ function Audit() {
             )}
 
             {/* Tabs */}
-            <div className="flex gap-1 rounded-lg border border-neutral-200 bg-neutral-50 p-1 w-fit">
-                {(["findings", "timeline"] as Tab[]).map((tab) => (
-                    <button
-                        key={tab}
-                        onClick={() => setActiveTab(tab)}
-                        className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
-                            activeTab === tab
-                                ? "bg-white text-neutral-900 shadow-sm"
-                                : "text-neutral-500 hover:text-neutral-700"
-                        }`}
-                    >
-                        {tab === "findings" ? "Findings" : "Audit Trail"}
-                    </button>
-                ))}
-            </div>
+            <SegmentedControl
+                options={[
+                    { value: "findings", label: "Findings" },
+                    { value: "timeline", label: "Audit Trail" },
+                ]}
+                value={activeTab}
+                onChange={v => setActiveTab(v as Tab)}
+                size="sm"
+            />
 
             {/* ---------------------------------------------------------------- */}
             {/* FINDINGS TAB                                                     */}
@@ -505,7 +507,7 @@ function Audit() {
                 <div className="space-y-3">
                     {/* Filter bar */}
                     <div className="flex flex-wrap items-center gap-2">
-                        <div className="flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5">
+                        <div className="search-pill flex items-center gap-1.5 px-2.5 py-1.5">
                             <Search size={12} className="text-neutral-400" />
                             <input
                                 value={findingSearch}
@@ -576,11 +578,13 @@ function Audit() {
                                 >
                                     <div className="flex items-start justify-between gap-4">
                                         <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                                                {statusBadge(f.status)}
-                                                <span className="text-xs text-neutral-400 font-medium">
+                                            <div className="flex items-start justify-between mb-1.5">
+                                                <span className="text-xs text-neutral-400 font-medium truncate pr-4">
                                                     {f.investigation_title}
                                                 </span>
+                                                <div className="flex items-center gap-1 shrink-0 h-4">
+                                                    {statusBadge(f.status)}
+                                                </div>
                                             </div>
                                             <p className="text-sm font-medium text-neutral-900 leading-snug">
                                                 {f.question}

@@ -32,7 +32,7 @@ def override_get_db():
     finally:
         db.close()
 
-app.dependency_overrides[get_db] = override_get_db
+
 
 client = TestClient(app)
 
@@ -40,6 +40,7 @@ from datetime import datetime
 
 @pytest.fixture
 def test_db():
+    app.dependency_overrides[get_db] = override_get_db
     db = TestingSessionLocal()
     try:
         # Clear existing
@@ -65,6 +66,8 @@ def test_db():
         yield db
     finally:
         db.close()
+        app.dependency_overrides.pop(get_db, None)
+        app.dependency_overrides.pop(get_current_user, None)
 
 from app.routers.auth import get_current_user
 

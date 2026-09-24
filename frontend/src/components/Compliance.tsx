@@ -30,24 +30,35 @@ const STATUS_OPTIONS = ["Not Started", "In Progress", "Compliant", "Non-Complian
 const RISK_OPTIONS = ["Low", "Medium", "High", "Critical"]
 
 function statusBadge(status: string) {
-    const map: Record<string, string> = {
-        Compliant: "bg-green-50 text-green-700 border-green-200",
-        "Non-Compliant": "bg-red-50 text-red-600 border-red-200",
-        "In Progress": "bg-blue-50 text-blue-600 border-blue-200",
-        "Not Started": "bg-neutral-100 text-neutral-500 border-neutral-200",
-        Waived: "bg-amber-50 text-amber-600 border-amber-200",
-    }
-    return map[status] ?? "bg-neutral-100 text-neutral-600 border-neutral-200"
+    let colorClass = "status-progress"
+    if (status === "Compliant") colorClass = "status-compliant"
+    if (status === "Non-Compliant") colorClass = "status-non-compliant"
+    if (status === "Not Started") colorClass = "status-progress"
+    if (status === "Waived") colorClass = "status-risk"
+
+    return (
+        <div className="status-dot-wrapper group" title={status}>
+            <div className="status-dot-container">
+                <div className={`status-dot ${colorClass}`} />
+                <span className="status-label">{status}</span>
+            </div>
+        </div>
+    )
 }
 
 function riskBadge(risk: string) {
-    const map: Record<string, string> = {
-        Low: "bg-green-50 text-green-600 border-green-200",
-        Medium: "bg-amber-50 text-amber-600 border-amber-200",
-        High: "bg-orange-50 text-orange-600 border-orange-200",
-        Critical: "bg-red-50 text-red-700 border-red-200",
-    }
-    return map[risk] ?? "bg-neutral-100 text-neutral-600 border-neutral-200"
+    let colorClass = "status-compliant"
+    if (risk === "Medium") colorClass = "status-risk"
+    if (risk === "High" || risk === "Critical") colorClass = "status-non-compliant"
+
+    return (
+        <div className="status-dot-wrapper group" title={risk}>
+            <div className="status-dot-container">
+                <div className={`status-dot ${colorClass}`} />
+                <span className="status-label">{risk}</span>
+            </div>
+        </div>
+    )
 }
 
 function OverviewBar({ overview }: { overview: Overview }) {
@@ -287,23 +298,19 @@ function ComplianceCard({ item }: { item: ComplianceItem }) {
                     )}
                 </div>
                 <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-semibold text-neutral-900">{item.title}</p>
-                        <span
-                            className={`rounded-full border px-2 py-0.5 text-xs font-medium ${statusBadge(item.status)}`}
-                        >
-                            {item.status}
-                        </span>
-                        <span
-                            className={`rounded-full border px-2 py-0.5 text-xs font-medium ${riskBadge(item.risk_level)}`}
-                        >
-                            {item.risk_level} Risk
-                        </span>
-                        {isOverdue && (
-                            <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-xs font-medium text-red-600">
-                                Overdue
-                            </span>
-                        )}
+                    <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-neutral-900 truncate">{item.title}</p>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0 h-5">
+                            {isOverdue && (
+                                <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-600 mr-2 uppercase tracking-wider">
+                                    Overdue
+                                </span>
+                            )}
+                            {statusBadge(item.status)}
+                            {riskBadge(item.risk_level)}
+                        </div>
                     </div>
                     <div className="mt-1 flex items-center gap-3 text-xs text-neutral-400 flex-wrap">
                         <span>{item.regulation}</span>
@@ -422,7 +429,7 @@ function Compliance() {
 
             {/* Filters */}
             <div className="flex shrink-0 items-center gap-3 border-b border-neutral-100 px-6 py-3">
-                <div className="flex flex-1 items-center gap-2 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2">
+                <div className="search-pill flex flex-1 items-center gap-2 px-3 py-2">
                     <Search size={12} className="text-neutral-400" />
                     <input
                         value={search}

@@ -60,7 +60,7 @@ async def run_comparison(docs, question="Compare these documents") -> str:
     CAPTURED_PROMPTS.clear()
     await compare_documents(db=None, question=question, documents=docs, limit=5)
     assert CAPTURED_PROMPTS, "No prompt was captured — ask_copilot_with_context not called"
-    return CAPTURED_PROMPTS[0]
+    return CAPTURED_PROMPTS[-1]
 
 
 # ---------------------------------------------------------------------------

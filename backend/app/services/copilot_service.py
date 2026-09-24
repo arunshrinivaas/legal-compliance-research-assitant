@@ -26,6 +26,9 @@ async def test_copilot() -> str:
             done.set()
 
         elif event.type == SessionEventType.SESSION_ERROR:
+            # We want to throw the actual error if possible
+            error_data = event.data
+            response_text = f"SESSION_ERROR: {error_data.message if hasattr(error_data, 'message') else str(error_data)}"
             done.set()
 
     session.on(handle_event)
@@ -34,13 +37,19 @@ async def test_copilot() -> str:
         "Respond with exactly: Copilot connection successful."
     )
 
-    await done.wait()
+    try:
+        await asyncio.wait_for(done.wait(), timeout=30.0)
+    except asyncio.TimeoutError:
+        print("[COPILOT] Request timed out after 30 seconds.")
 
     await session.disconnect()
     await client.stop()
 
     if not response_text:
         return "No response received from Copilot."
+
+    if response_text.startswith("SESSION_ERROR:"):
+        raise RuntimeError(f"Copilot API failed: {response_text[14:].strip()}")
 
     return response_text
 
@@ -69,6 +78,8 @@ async def ask_copilot_with_context(
             done.set()
 
         elif event.type == SessionEventType.SESSION_ERROR:
+            error_data = event.data
+            response_text = f"SESSION_ERROR: {error_data.message if hasattr(error_data, 'message') else str(error_data)}"
             done.set()
 
     session.on(handle_event)
@@ -110,14 +121,19 @@ Document context:
 
     await session.send(prompt)
 
-    await done.wait()
-
-    print("Copilot finished generating the answer.")
-
-    await session.disconnect()
-    await client.stop()
+    try:
+        await asyncio.wait_for(done.wait(), timeout=45.0)
+    except asyncio.TimeoutError:
+        print("[COPILOT] Request timed out after 45 seconds.")
+    finally:
+        print("Copilot finished generating the answer.")
+        await session.disconnect()
+        await client.stop()
 
     if not response_text:
         return "No response received from Copilot."
+
+    if response_text.startswith("SESSION_ERROR:"):
+        raise RuntimeError(f"Copilot API failed: {response_text[14:].strip()}")
 
     return response_text
