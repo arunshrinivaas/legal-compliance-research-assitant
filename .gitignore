@@ -156,3 +156,6 @@ backend/uploads/
 
 # Python virtual environment (backend)
 backend/.venv/
+
+# Local development scratch files
+scratch/
