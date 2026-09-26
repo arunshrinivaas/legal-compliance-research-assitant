@@ -26,7 +26,7 @@ function statusBadge(status: string) {
     if (status === "Draft") colorClass = "status-risk"
 
     return (
-        <div className="status-dot-wrapper group" title={status}>
+        <div className="status-dot-wrapper" title={status}>
             <div className="status-dot-container">
                 <div className={`status-dot ${colorClass}`} />
                 <span className="status-label">{status}</span>
@@ -207,7 +207,7 @@ function RegulationCard({ regulation }: { regulation: Regulation }) {
         <div className="rounded-xl border border-neutral-200 bg-white overflow-hidden">
             <button
                 onClick={() => setExpanded(!expanded)}
-                className="flex w-full items-start gap-3 px-5 py-4 text-left hover:bg-neutral-50"
+                className="group flex w-full items-start gap-3 px-5 py-4 text-left hover:bg-neutral-50"
             >
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-neutral-100">
                     <Gavel size={14} className="text-neutral-500" />
@@ -217,7 +217,7 @@ function RegulationCard({ regulation }: { regulation: Regulation }) {
                         <div className="min-w-0 flex-1">
                             <p className="text-sm font-semibold text-neutral-900 truncate">{regulation.title}</p>
                         </div>
-                        <div className="flex items-center gap-1 shrink-0 h-5">
+                        <div className="flex items-start justify-end gap-1 shrink-0">
                             {statusBadge(regulation.status)}
                         </div>
                     </div>

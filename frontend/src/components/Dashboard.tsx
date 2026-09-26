@@ -10,7 +10,6 @@ import {
     HelpCircle,
     LayoutDashboard,
     Search,
-    Settings,
     ShieldCheck,
     Sparkles,
     Users,
@@ -304,7 +303,7 @@ function SettingsWorkspace({ user }: { user?: any }) {
                         <>
                             <SettingsHeader title="Appearance" sub="Customize how OpusLex looks on your device." />
                             <SettingsSection title="Font size" description="Choose how large application text should appear. The scale maintains typographic hierarchy throughout the application.">
-                                <GlassSelector 
+                                <GlassSelector
                                     options={sizes}
                                     value={fontSize}
                                     onChange={setFontSize as (v: string) => void}
@@ -315,7 +314,7 @@ function SettingsWorkspace({ user }: { user?: any }) {
                             </SettingsSection>
 
                             <SettingsSection title="Density" description="Control how much space interface elements use.">
-                                <GlassSelector 
+                                <GlassSelector
                                     options={densityOptions}
                                     value={density}
                                     onChange={setDensity as (v: string) => void}
@@ -1043,7 +1042,7 @@ function Dashboard() {
         localStorage.removeItem("current_user")
         window.location.reload()
     }
-    
+
     const initials = user?.full_name ? user.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0,2) : "U"
 
 
@@ -1113,25 +1112,18 @@ function Dashboard() {
                 label: "Governance",
                 icon: <Gavel size={15} />,
             },
-            {
-                id: "help",
-                label: "Help",
-                icon: <HelpCircle size={15} />,
-            },
-            {
-                id: "settings",
-                label: "Settings",
-                icon: <Settings size={15} />,
-            },
         ]
 
     return (
         <div className="h-[100dvh] overflow-hidden bg-neutral-50 text-neutral-900 flex">
             <aside className="flex flex-col h-[100dvh] w-[240px] shrink-0 border-r border-neutral-200 bg-white">
                     {/* Brand lockup */}
-                    <div className="flex shrink-0 items-center px-5 py-4">
+                    <button
+                        className="flex shrink-0 items-center px-5 py-4 transition hover:opacity-80"
+                        onClick={() => setActiveSection("home")}
+                    >
                         <OpusLexBrand />
-                    </div>
+                    </button>
 
                     <div className="flex-1 overflow-y-auto px-3 py-2">
                         <div className="mb-2">
@@ -1175,7 +1167,7 @@ function Dashboard() {
 
                             <ChevronRight size={16} className="text-neutral-400 group-hover:text-neutral-600" style={{ transition: "color 160ms ease" }} />
                         </button>
-                        
+
                         {isMenuOpen && (
                             <div className="absolute bottom-[calc(100%+8px)] left-3 w-[calc(100%-24px)] rounded-xl border border-neutral-200 bg-white shadow-xl p-1.5 z-50 overflow-hidden">
                                 <div className="px-3 py-2.5 border-b border-neutral-100 mb-1.5">
@@ -1185,6 +1177,7 @@ function Dashboard() {
                                 <div className="p-1 space-y-0.5">
                                     <button onClick={() => { setShowProfile(true); setIsMenuOpen(false); }} className="menu-item w-full text-left px-2.5 py-2 text-body text-neutral-700">Profile</button>
                                     <button onClick={() => { setActiveSection("settings"); setIsMenuOpen(false); }} className="menu-item w-full text-left px-2.5 py-2 text-body text-neutral-700">Settings</button>
+                                    <button onClick={() => { setActiveSection("help"); setIsMenuOpen(false); }} className="menu-item w-full text-left px-2.5 py-2 text-body text-neutral-700">Help</button>
                                 </div>
                                 <div className="mt-1.5 p-1 border-t border-neutral-100">
                                     <button onClick={handleLogout} className="menu-item menu-item-danger w-full text-left px-2.5 py-2 text-body text-red-600 font-medium">Log out</button>
@@ -1440,7 +1433,7 @@ function Dashboard() {
                             />
                         </section>
                     )}
-                    
+
                     {showProfile && (
                         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/20">
                             <div className="w-full max-w-sm rounded-xl border border-neutral-200 bg-white p-6 shadow-xl">
@@ -1465,7 +1458,7 @@ function Dashboard() {
                             </div>
                         </div>
                     )}
-                    
+
                     {showFaq && (
                         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/20">
                             <div className="w-full max-w-md rounded-xl border border-neutral-200 bg-white p-6 shadow-xl">

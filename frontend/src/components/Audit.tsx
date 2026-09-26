@@ -112,7 +112,7 @@ function statusBadge(status: string) {
     if (status === "failed") { colorClass = "status-non-compliant"; label = "Failed"; }
 
     return (
-        <div className="status-dot-wrapper group" title={label}>
+        <div className="status-dot-wrapper" title={label}>
             <div className="status-dot-container">
                 <div className={`status-dot ${colorClass}`} />
                 <span className="status-label">{label}</span>
@@ -573,7 +573,7 @@ function Audit() {
                             {findings.map((f) => (
                                 <div
                                     key={f.id}
-                                    className="cursor-pointer rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 hover:bg-neutral-50"
+                                    className="group cursor-pointer rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 hover:bg-neutral-50"
                                     onClick={() => setSelectedFinding(f)}
                                 >
                                     <div className="flex items-start justify-between gap-4">
@@ -582,7 +582,7 @@ function Audit() {
                                                 <span className="text-xs text-neutral-400 font-medium truncate pr-4">
                                                     {f.investigation_title}
                                                 </span>
-                                                <div className="flex items-center gap-1 shrink-0 h-4">
+                                                <div className="flex items-start justify-end gap-1 shrink-0 h-4">
                                                     {statusBadge(f.status)}
                                                 </div>
                                             </div>

@@ -644,37 +644,28 @@ button {
 
 /* ── Status Dots ── */
 .status-dot-wrapper {
-  position: relative;
   display: inline-flex;
-  width: 20px;
-  height: 20px;
-  align-items: center;
-  justify-content: center;
+  flex-shrink: 0;
 }
 
 .status-dot-container {
-  position: absolute;
-  left: 0;
   display: inline-flex;
   align-items: center;
   background-color: transparent;
   border: 1px solid transparent;
   border-radius: 9999px;
   height: 20px;
-  transition: all 150ms ease;
+  transition: all 300ms ease;
   overflow: hidden;
   max-width: 20px;
   white-space: nowrap;
-  z-index: 10;
 }
 
-.status-dot-container:hover {
+.group:hover .status-dot-container {
   max-width: 150px;
   padding-right: 12px;
   background-color: white;
   border-color: var(--color-neutral-200);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  z-index: 20;
 }
 
 .status-dot {
@@ -691,10 +682,10 @@ button {
   margin-left: 8px;
   font-size: var(--fs-caption, 0.75rem);
   font-weight: 500;
-  transition: opacity 150ms ease;
+  transition: opacity 300ms ease;
 }
 
-.status-dot-container:hover .status-label {
+.group:hover .status-label {
   opacity: 1;
 }
 

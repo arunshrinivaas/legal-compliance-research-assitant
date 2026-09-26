@@ -131,15 +131,7 @@ async def _mock_copilot(question: str, context: str) -> str:
     return f"[MOCK ANALYSIS for Document {label}] evidence_len={len(question)}"
 
 
-# Patch both the module-level names and the imported references in rag_service
-rag_mod.search_similar_chunks = _mock_search
-rag_mod.ask_copilot_with_context = _mock_copilot
-# Also patch ask_copilot_with_context inside the copilot_service module
-# (in case rag_service imports it via `from … import`)
-# The critical patch is the one inside the rag_service module namespace:
-import app.services.rag_service as _rs
-_rs.search_similar_chunks = _mock_search
-_rs.ask_copilot_with_context = _mock_copilot
+
 
 
 # ---------------------------------------------------------------------------
@@ -148,9 +140,17 @@ _rs.ask_copilot_with_context = _mock_copilot
 
 async def _run_compare(docs: list[dict], question: str = "Compare") -> dict:
     _reset_logs()
-    result = await compare_documents(
-        db=None, question=question, documents=docs, limit=5
-    )
+    original_search = rag_mod.search_similar_chunks
+    original_ask = rag_mod.ask_copilot_with_context
+    rag_mod.search_similar_chunks = _mock_search
+    rag_mod.ask_copilot_with_context = _mock_copilot
+    try:
+        result = await compare_documents(
+            db=None, question=question, documents=docs, limit=5
+        )
+    finally:
+        rag_mod.search_similar_chunks = original_search
+        rag_mod.ask_copilot_with_context = original_ask
     return result
 
 

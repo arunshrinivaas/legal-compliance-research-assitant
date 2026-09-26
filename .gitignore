@@ -159,3 +159,6 @@ backend/.venv/
 
 # Local development scratch files
 scratch/
+
+# Local Python environment
+.venv/

@@ -37,7 +37,7 @@ function statusBadge(status: string) {
     if (status === "Waived") colorClass = "status-risk"
 
     return (
-        <div className="status-dot-wrapper group" title={status}>
+        <div className="status-dot-wrapper" title={status}>
             <div className="status-dot-container">
                 <div className={`status-dot ${colorClass}`} />
                 <span className="status-label">{status}</span>
@@ -52,7 +52,7 @@ function riskBadge(risk: string) {
     if (risk === "High" || risk === "Critical") colorClass = "status-non-compliant"
 
     return (
-        <div className="status-dot-wrapper group" title={risk}>
+        <div className="status-dot-wrapper" title={risk}>
             <div className="status-dot-container">
                 <div className={`status-dot ${colorClass}`} />
                 <span className="status-label">{risk}</span>
@@ -288,7 +288,7 @@ function ComplianceCard({ item }: { item: ComplianceItem }) {
         <div className="rounded-xl border border-neutral-200 bg-white overflow-hidden">
             <button
                 onClick={() => setExpanded(!expanded)}
-                className="flex w-full items-start gap-3 px-5 py-4 text-left hover:bg-neutral-50"
+                className="group flex w-full items-start gap-3 px-5 py-4 text-left hover:bg-neutral-50"
             >
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-neutral-100">
                     {isOverdue ? (
@@ -302,9 +302,9 @@ function ComplianceCard({ item }: { item: ComplianceItem }) {
                         <div className="min-w-0 flex-1">
                             <p className="text-sm font-semibold text-neutral-900 truncate">{item.title}</p>
                         </div>
-                        <div className="flex items-center gap-1 shrink-0 h-5">
+                        <div className="flex items-start justify-end gap-1 shrink-0">
                             {isOverdue && (
-                                <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-600 mr-2 uppercase tracking-wider">
+                                <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-600 mr-1 uppercase tracking-wider">
                                     Overdue
                                 </span>
                             )}

@@ -26,7 +26,7 @@ function statusBadge(status: string) {
     if (status === "Archived") colorClass = "status-risk"
 
     return (
-        <div className="status-dot-wrapper group" title={status}>
+        <div className="status-dot-wrapper" title={status}>
             <div className="status-dot-container">
                 <div className={`status-dot ${colorClass}`} />
                 <span className="status-label">{status}</span>
@@ -243,7 +243,7 @@ function PolicyCard({
         <div className="rounded-xl border border-neutral-200 bg-white overflow-hidden">
             <button
                 onClick={() => setExpanded(!expanded)}
-                className="flex w-full items-start gap-3 px-5 py-4 text-left hover:bg-neutral-50"
+                className="group flex w-full items-start gap-3 px-5 py-4 text-left hover:bg-neutral-50"
             >
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-neutral-100">
                     <FileText size={14} className="text-neutral-500" />
@@ -256,7 +256,7 @@ function PolicyCard({
                                 v{policy.version}
                             </span>
                         </div>
-                        <div className="flex items-center gap-1 shrink-0 h-5">
+                        <div className="flex items-start justify-end gap-1 shrink-0">
                             {statusBadge(policy.status)}
                         </div>
                     </div>

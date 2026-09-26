@@ -47,7 +47,6 @@ async def _capturing_copilot(question, context):
 
 rag_mod.search_similar_chunks = _mock_search
 rag_mod.ask_copilot_with_context = _capturing_copilot
-copilot_mod.ask_copilot_with_context = _capturing_copilot
 
 from app.services.rag_service import compare_documents
 
@@ -58,7 +57,15 @@ from app.services.rag_service import compare_documents
 
 async def run_comparison(docs, question="Compare these documents") -> str:
     CAPTURED_PROMPTS.clear()
-    await compare_documents(db=None, question=question, documents=docs, limit=5)
+    original_search = rag_mod.search_similar_chunks
+    original_ask = rag_mod.ask_copilot_with_context
+    rag_mod.search_similar_chunks = _mock_search
+    rag_mod.ask_copilot_with_context = _capturing_copilot
+    try:
+        await compare_documents(db=None, question=question, documents=docs, limit=5)
+    finally:
+        rag_mod.search_similar_chunks = original_search
+        rag_mod.ask_copilot_with_context = original_ask
     assert CAPTURED_PROMPTS, "No prompt was captured — ask_copilot_with_context not called"
     return CAPTURED_PROMPTS[-1]
 
@@ -93,11 +100,11 @@ async def test_required_participants_header():
     ]
     prompt = await run_comparison(docs)
 
-    assert "REQUIRED PARTICIPANTS" in prompt, "REQUIRED PARTICIPANTS header missing"
+    assert "DOCUMENT IDENTITY" in prompt, "DOCUMENT IDENTITY header missing"
     # The header line must list all three labels
     header_line_ok = "A" in prompt and "B" in prompt and "C" in prompt
     assert header_line_ok
-    print("[TEST P2] REQUIRED PARTICIPANTS header present with A, B, C ✓")
+    print("[TEST P2] DOCUMENT IDENTITY header present with A, B, C ✓")
 
 
 # ---------------------------------------------------------------------------
@@ -157,9 +164,8 @@ async def test_2_doc_prompt_no_spurious_labels():
     assert "Document B" in prompt
     # "Document C" and "Document D" must not appear as required slots
     # (they may appear only if the LLM echoes something, but they shouldn't be in our prompt)
-    # We check the slot block specifically via "Document C —" (slot format)
-    assert "Document C —" not in prompt, "Spurious Document C slot in 2-doc prompt"
-    assert "Document D —" not in prompt, "Spurious Document D slot in 2-doc prompt"
+    assert "DOCUMENT C ANALYSIS" not in prompt, "Spurious Document C slot in 2-doc prompt"
+    assert "DOCUMENT D ANALYSIS" not in prompt, "Spurious Document D slot in 2-doc prompt"
     print("[TEST P5] 2-doc prompt has A and B only — no spurious C/D slots ✓")
 
 
@@ -178,7 +184,7 @@ async def test_4_doc_prompt():
 
     for label in ("A", "B", "C", "D"):
         assert f"Document {label}" in prompt, f"Document {label} missing from 4-doc prompt"
-    assert "Document D —" in prompt, "Document D slot missing from 4-doc prompt"
+    assert "DOCUMENT D ANALYSIS" in prompt, "Document D slot missing from 4-doc prompt"
     print("[TEST P6] 4-doc prompt has A, B, C, D slots ✓")
 
 
@@ -207,18 +213,18 @@ async def test_zero_chunk_doc_has_forced_slot():
     await compare_documents(db=None, question="Compare", documents=docs, limit=5)
     rag_mod.ask_copilot_with_context = _capturing_copilot
 
-    prompt = CAPTURED_PROMPTS[0]
-    ctx = CAPTURED_CONTEXTS[0]
+    prompt_c = CAPTURED_PROMPTS[2]
+    ctx_c = CAPTURED_CONTEXTS[2]
 
     # Evidence is now embedded in the PROMPT (not the context stub).
-    # The zero-chunk notice for doc27 must appear in the prompt.
-    assert "No relevant chunks were retrieved" in prompt, \
+    # The zero-chunk notice for doc27 must appear in its MAP prompt.
+    assert "No relevant chunks were retrieved" in prompt_c, \
         "Zero-chunk notice for doc27 missing from prompt (evidence should be embedded in prompt)"
     # The forced per-document slot for C must be in the PROMPT
-    assert "Document C —" in prompt, \
+    assert "Document C" in prompt_c, \
         "Document C forced slot missing from prompt even though 0 chunks were retrieved"
     # Context stub should be minimal (not the full evidence block)
-    assert len(ctx) < 200, f"Context stub is too large ({len(ctx)} chars) — evidence may not be embedded in prompt"
+    assert len(ctx_c) < 200, f"Context stub is too large ({len(ctx_c)} chars) — evidence may not be embedded in prompt"
     print("[TEST P7] Zero-chunk doc: forced slot in prompt ✓, zero-chunk notice in prompt ✓, context stub minimal ✓")
 
 
@@ -263,29 +269,29 @@ async def test_evidence_embedded_in_prompt():
     rag_mod.ask_copilot_with_context = _capturing_copilot
     _rm.search_similar_chunks = original_search
 
-    prompt = CAPTURED_PROMPTS[0]
-    ctx = CAPTURED_CONTEXTS[0]
+    reduce_prompt = CAPTURED_PROMPTS[-1]
+    reduce_ctx = CAPTURED_CONTEXTS[-1]
 
-    # All 5 filenames must appear in the prompt (embedded evidence)
+    # All 5 filenames must appear in the reduce prompt
     for doc in docs:
-        assert doc["filename"] in prompt, \
-            f"{doc['filename']} missing from prompt — evidence not embedded correctly"
+        assert doc["filename"] in reduce_prompt, \
+            f"{doc['filename']} missing from REDUCE prompt"
 
-    # All 5 document IDs must appear in the prompt
+    # All 5 document IDs must appear in the reduce prompt
     for doc in docs:
-        assert str(doc["id"]) in prompt, \
-            f"ID {doc['id']} missing from prompt"
+        assert str(doc["id"]) in reduce_prompt, \
+            f"ID {doc['id']} missing from REDUCE prompt"
 
-    # The context stub must be short — it should NOT contain the full evidence text
-    assert len(ctx) < 200, \
-        f"Context stub is too large ({len(ctx)} chars) — evidence may be split between prompt and context"
+    # The context stub must be short
+    assert len(reduce_ctx) < 200, \
+        f"Context stub is too large ({len(reduce_ctx)} chars)"
 
-    # All 5 labels must be in the prompt
+    # All 5 labels must be in the reduce prompt
     for label in ["A", "B", "C", "D", "E"]:
-        assert f"Document {label}" in prompt, f"Document {label} missing from 5-doc prompt"
+        assert f"Document {label}" in reduce_prompt, f"Document {label} missing from 5-doc prompt"
 
     print("[TEST P11] 5-doc: all evidence embedded in prompt, context stub is minimal ✓")
-    print(f"           prompt chars = {len(prompt)}, context stub chars = {len(ctx)}")
+    print(f"           prompt chars = {len(reduce_prompt)}, context stub chars = {len(reduce_ctx)}")
 
 
 # ---------------------------------------------------------------------------
@@ -299,7 +305,15 @@ async def test_no_out_of_scope_sources():
         {"id": 27, "title": "Doc 27", "filename": "doc27.pdf", "jurisdiction": "UK"},
     ]
     CAPTURED_PROMPTS.clear()
-    result = await compare_documents(db=None, question="Compare", documents=docs, limit=5)
+    original_search = rag_mod.search_similar_chunks
+    original_ask = rag_mod.ask_copilot_with_context
+    rag_mod.search_similar_chunks = _mock_search
+    rag_mod.ask_copilot_with_context = _capturing_copilot
+    try:
+        result = await compare_documents(db=None, question="Compare", documents=docs, limit=5)
+    finally:
+        rag_mod.search_similar_chunks = original_search
+        rag_mod.ask_copilot_with_context = original_ask
     all_ids = {src["document_id"] for src_list in result["sources"].values() for src in src_list}
     assert all_ids <= {25, 23, 27}, f"Out-of-scope IDs in sources: {all_ids - {25, 23, 27}}"
     print("[TEST P8] No out-of-scope document IDs in sources ✓")
