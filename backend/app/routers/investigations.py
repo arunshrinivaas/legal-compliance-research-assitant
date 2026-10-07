@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -10,6 +10,7 @@ from app.database import get_db
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
 from app.models.investigation import Investigation
+from app.models.investigation_comment import InvestigationComment
 from app.models.investigation_document import InvestigationDocument
 from app.models.investigation_query import InvestigationQuery
 from app.routers.auth import get_current_user
@@ -40,6 +41,10 @@ class InvestigationUpdate(BaseModel):
 class InvestigationStatusUpdate(BaseModel):
     status: Literal["Active", "Archived"]
 
+class InvestigationReviewUpdate(BaseModel):
+    review_status: Literal["Approved", "Rejected"]
+    reason: str | None = None
+
 
 class InvestigationResponse(BaseModel):
     id: int
@@ -47,6 +52,9 @@ class InvestigationResponse(BaseModel):
     description: str | None
     status: str
     user_id: int
+    review_status: str | None = None
+    reviewer_id: int | None = None
+    reviewed_at: datetime | None = None
 
     model_config = {"from_attributes": True}
 
@@ -61,6 +69,34 @@ class InvestigationQueryResponse(BaseModel):
     investigation_id: int
     question: str
     answer: str | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class CommentCreate(BaseModel):
+    text: str = Field(min_length=1)
+
+
+class CommentResponse(BaseModel):
+    id: int
+    investigation_id: int
+    user_id: int
+    text: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class CommentCreate(BaseModel):
+    text: str = Field(min_length=1)
+
+
+class CommentResponse(BaseModel):
+    id: int
+    investigation_id: int
+    user_id: int
+    text: str
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -223,6 +259,50 @@ def update_investigation_status(
         )
 
     investigation.status = payload.status
+
+    db.commit()
+    db.refresh(investigation)
+
+    return investigation
+
+
+@router.patch(
+    "/{investigation_id}/review",
+    response_model=InvestigationResponse,
+    status_code=status.HTTP_200_OK,
+)
+def update_investigation_review(
+    investigation_id: int,
+    payload: InvestigationReviewUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    investigation = db.scalar(
+        select(Investigation).where(
+            Investigation.id == investigation_id,
+            Investigation.user_id == current_user.id,
+        )
+    )
+
+    if investigation is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Investigation not found",
+        )
+
+    investigation.review_status = payload.review_status
+    investigation.reviewer_id = current_user.id
+    investigation.reviewed_at = datetime.now(timezone.utc)
+
+    if payload.reason and payload.reason.strip():
+        comment_text = f"[Review — {payload.review_status}] {payload.reason.strip()}"
+        new_comment = InvestigationComment(
+            investigation_id=investigation.id,
+            user_id=current_user.id,
+            text=comment_text,
+            created_at=datetime.now(timezone.utc)
+        )
+        db.add(new_comment)
 
     db.commit()
     db.refresh(investigation)

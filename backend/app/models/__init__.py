@@ -7,3 +7,5 @@ from app.models.document import Document  # noqa: F401
 from app.models.investigation import Investigation  # noqa: F401
 from app.models.agent_run import AgentRun  # noqa: F401
 from app.models.knowledge_post import KnowledgePost  # noqa: F401
+from app.models.investigation_comment import InvestigationComment  # noqa: F401
+from app.models.integration import Integration  # noqa: F401

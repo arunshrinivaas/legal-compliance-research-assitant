@@ -13,6 +13,7 @@ def search_similar_chunks(
     limit: int = 5,
     distance_threshold: float = DEFAULT_DISTANCE_THRESHOLD,
     document_ids: list[int] | None = None,
+    user_id: int | None = None,
 ):
     query_embedding = generate_embedding(query)
 
@@ -47,11 +48,17 @@ def search_similar_chunks(
             print("[DIAG:retrieval] ⚠ document_ids is empty list → returning []")
             return []
 
-        document_filter = """
+        document_filter += """
           AND document_chunks.document_id = ANY(:document_ids)
         """
 
         base_params["document_ids"] = document_ids
+
+    if user_id is not None:
+        document_filter += """
+          AND documents.user_id = :user_id
+        """
+        base_params["user_id"] = user_id
 
     print(f"[DIAG:retrieval] document_filter applied = {bool(document_filter)}")
     print(f"[DIAG:retrieval] base_params keys = {list(base_params.keys())}")
@@ -67,6 +74,7 @@ def search_similar_chunks(
             document_chunks.chunk_index,
             document_chunks.embedding <=> CAST(:query_embedding AS vector) AS distance
         FROM document_chunks
+        { "JOIN documents ON documents.id = document_chunks.document_id" if user_id is not None else "" }
         WHERE document_chunks.embedding IS NOT NULL
           {document_filter}
         ORDER BY document_chunks.embedding <=> CAST(:query_embedding AS vector)
@@ -75,6 +83,8 @@ def search_similar_chunks(
     diag_params = {"query_embedding": str(query_embedding)}
     if document_ids:
         diag_params["document_ids"] = document_ids
+    if user_id is not None:
+        diag_params["user_id"] = user_id
     diag_rows = db.execute(sql_no_threshold, diag_params).mappings().all()
     print(f"[DIAG:retrieval] Raw distances (no threshold, {len(diag_rows)} rows):")
     for r in diag_rows:

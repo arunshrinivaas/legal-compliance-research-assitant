@@ -1,8 +1,19 @@
 import React, { createContext, useContext, useEffect, useState } from "react"
+import { useTranslation } from "react-i18next"
 
 export type FontSize = "xs" | "s" | "m" | "l" | "xl"
 export type Density = "comfortable" | "compact"
 export type LandingSection = "home" | "research" | "investigations" | "agents" | "audit" | "governance"
+
+export type NotificationCategory = "investigation" | "agent_run" | "knowledge" | "security"
+export type NotificationPrefs = Record<NotificationCategory, { inApp: boolean; email: boolean }>
+
+const DEFAULT_NOTIFICATIONS: NotificationPrefs = {
+    investigation: { inApp: true, email: true },
+    agent_run: { inApp: true, email: true },
+    knowledge: { inApp: true, email: false },
+    security: { inApp: true, email: true },
+}
 
 type PreferencesContextType = {
     fontSize: FontSize
@@ -15,6 +26,16 @@ type PreferencesContextType = {
     setReduceMotion: (v: boolean) => void
     largerTargets: boolean
     setLargerTargets: (v: boolean) => void
+    highContrast: boolean
+    setHighContrast: (v: boolean) => void
+    navConfig: { id: string, hidden: boolean }[] | null
+    setNavConfig: (config: { id: string, hidden: boolean }[] | null) => void
+    notificationPrefs: NotificationPrefs
+    setNotificationPrefs: (n: NotificationPrefs) => void
+    language: string
+    setLanguage: (lang: string) => void
+    workspaceName: string | null
+    setWorkspaceName: (name: string) => void
 }
 
 const PreferencesContext = createContext<PreferencesContextType | undefined>(undefined)
@@ -46,6 +67,32 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     const [largerTargets, setLargerTargetsState] = useState<boolean>(() =>
         localStorage.getItem("pref_larger_targets") === "true"
     )
+    const [highContrast, setHighContrastState] = useState<boolean>(() =>
+        localStorage.getItem("pref_high_contrast") === "true"
+    )
+    const [navConfig, setNavConfigState] = useState<{ id: string, hidden: boolean }[] | null>(() => {
+        try {
+            const saved = localStorage.getItem("pref_nav_config")
+            if (saved) return JSON.parse(saved)
+        } catch {}
+        return null
+    })
+    const [notificationPrefs, setNotificationPrefsState] = useState<NotificationPrefs>(() => {
+        try {
+            const saved = localStorage.getItem("pref_notifications")
+            if (saved) return { ...DEFAULT_NOTIFICATIONS, ...JSON.parse(saved) }
+        } catch {}
+        return DEFAULT_NOTIFICATIONS
+    })
+    const [language, setLanguageState] = useState<string>(() =>
+        readLS<string>("pref_language", "en", ["en", "es"])
+    )
+    const [workspaceName, setWorkspaceNameState] = useState<string | null>(() => {
+        const stored = localStorage.getItem("pref_workspace_name")
+        if (stored !== null) return stored
+        return null
+    })
+    const { i18n } = useTranslation()
 
     // Apply font size
     useEffect(() => {
@@ -77,16 +124,58 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
         }
     }, [largerTargets])
 
+    // Apply high contrast
+    useEffect(() => {
+        localStorage.setItem("pref_high_contrast", String(highContrast))
+        if (highContrast) {
+            document.documentElement.classList.add("high-contrast")
+        } else {
+            document.documentElement.classList.remove("high-contrast")
+        }
+    }, [highContrast])
+
+    // Apply nav config
+    useEffect(() => {
+        if (navConfig === null) {
+            localStorage.removeItem("pref_nav_config")
+        } else {
+            localStorage.setItem("pref_nav_config", JSON.stringify(navConfig))
+        }
+    }, [navConfig])
+
+    // Apply notification prefs
+    useEffect(() => {
+        localStorage.setItem("pref_notifications", JSON.stringify(notificationPrefs))
+    }, [notificationPrefs])
+
     // Apply landing section
     useEffect(() => {
         localStorage.setItem("pref_landing", landingSection)
     }, [landingSection])
+
+    // Apply language
+    useEffect(() => {
+        localStorage.setItem("pref_language", language)
+        i18n.changeLanguage(language)
+    }, [language, i18n])
+
+    // Apply workspace name
+    useEffect(() => {
+        if (workspaceName !== null) {
+            localStorage.setItem("pref_workspace_name", workspaceName)
+        }
+    }, [workspaceName])
 
     const setFontSize = (size: FontSize) => setFontSizeState(size)
     const setDensity = (d: Density) => setDensityState(d)
     const setLandingSection = (s: LandingSection) => setLandingSectionState(s)
     const setReduceMotion = (v: boolean) => setReduceMotionState(v)
     const setLargerTargets = (v: boolean) => setLargerTargetsState(v)
+    const setHighContrast = (v: boolean) => setHighContrastState(v)
+    const setNavConfig = (config: { id: string, hidden: boolean }[] | null) => setNavConfigState(config)
+    const setNotificationPrefs = (n: NotificationPrefs) => setNotificationPrefsState(n)
+    const setLanguage = (lang: string) => setLanguageState(lang)
+    const setWorkspaceName = (name: string) => setWorkspaceNameState(name)
 
     return (
         <PreferencesContext.Provider value={{
@@ -95,6 +184,11 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
             landingSection, setLandingSection,
             reduceMotion, setReduceMotion,
             largerTargets, setLargerTargets,
+            highContrast, setHighContrast,
+            navConfig, setNavConfig,
+            notificationPrefs, setNotificationPrefs,
+            language, setLanguage,
+            workspaceName, setWorkspaceName,
         }}>
             {children}
         </PreferencesContext.Provider>

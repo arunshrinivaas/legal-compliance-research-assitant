@@ -280,19 +280,30 @@ def delete_document(
         synchronize_session=False
     )
 
-    upload_dir = Path(settings.upload_dir)
-
-    new_file_path = (
-        upload_dir
-        / f"{document.file_hash}_{document.filename}"
+    other_references = (
+        db.query(Document)
+        .filter(
+            Document.id != document_id,
+            Document.file_hash == document.file_hash,
+            Document.filename == document.filename,
+        )
+        .first()
     )
 
-    old_file_path = upload_dir / document.filename
+    if not other_references:
+        upload_dir = Path(settings.upload_dir)
 
-    if new_file_path.exists():
-        new_file_path.unlink()
-    elif old_file_path.exists():
-        old_file_path.unlink()
+        new_file_path = (
+            upload_dir
+            / f"{document.file_hash}_{document.filename}"
+        )
+
+        old_file_path = upload_dir / document.filename
+
+        if new_file_path.exists():
+            new_file_path.unlink()
+        elif old_file_path.exists():
+            old_file_path.unlink()
 
     db.delete(document)
     db.commit()

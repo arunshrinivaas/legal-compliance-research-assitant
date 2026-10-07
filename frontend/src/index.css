@@ -712,3 +712,81 @@ button {
   transition: none !important;
   transform: none !important;
 }
+
+/* ======================================================
+   HIGH CONTRAST MODE
+   ====================================================== */
+
+/* Global text/border contrast adjustments */
+.high-contrast {
+  /* Darken muted text colors to ensure at least 4.5:1 ratio */
+  --color-neutral-400: #404040;
+  --color-neutral-500: #171717;
+  --color-neutral-600: #000000;
+
+  /* Darken borders for structural clarity */
+  --color-neutral-200: #737373;
+  --color-neutral-300: #404040;
+}
+
+/* Visible focus indicators everywhere */
+.high-contrast *:focus-visible {
+  outline: 3px solid #000 !important;
+  outline-offset: 2px !important;
+}
+
+/* Make component borders thicker and darker */
+.high-contrast .card-enterprise,
+.high-contrast .filter-chip,
+.high-contrast .btn-secondary,
+.high-contrast .search-pill,
+.high-contrast .status-dot-container,
+.high-contrast .glass-bubble {
+  border-color: #000 !important;
+  border-width: 2px !important;
+}
+
+/* Adjust padding for thicker borders on standard components to prevent layout shift */
+.high-contrast .filter-chip {
+  padding-top: calc(0.25rem - 1px);
+  padding-bottom: calc(0.25rem - 1px);
+}
+
+.high-contrast .btn-secondary {
+  padding-top: calc(0.625rem - 1px);
+  padding-bottom: calc(0.625rem - 1px);
+}
+
+/* Stronger text on specific interactive components */
+.high-contrast .filter-chip,
+.high-contrast .btn-secondary,
+.high-contrast .settings-pill {
+  color: #000 !important;
+  font-weight: 600 !important;
+}
+
+/* Better placeholders */
+.high-contrast ::placeholder {
+  color: #404040 !important;
+  opacity: 1 !important;
+}
+
+/* Prevent contrast issues on dark backgrounds (like Auth video overlay, buttons) */
+.high-contrast .bg-neutral-900 {
+  --color-neutral-400: #a3a3a3;
+  --color-neutral-500: #d4d4d4;
+  --color-neutral-600: #e5e5e5;
+  --color-neutral-200: #404040;
+}
+
+/* Ensure text on black remains white, not overridden to dark */
+.high-contrast .bg-neutral-900,
+.high-contrast .bg-neutral-900 .text-white {
+  color: #ffffff !important;
+}
+
+.high-contrast .btn-primary {
+  background: #000 !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+}

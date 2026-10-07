@@ -1,652 +1,890 @@
-import { useState, useEffect, useRef, useCallback } from "react"
-import { OpusLexBrand } from "./OpusLexBrand"
-import { Smartphone, Mail, ArrowLeft, Loader2 } from "lucide-react"
+import React, { useState, useEffect, useRef } from "react"
+import logoWhite from "../assets/OpusLexLogoWhite.png"
+import logoLight from "../assets/OpusLexLogoLight.png"
+
+import { Smartphone, ArrowLeft, Loader2, Mail } from "lucide-react"
+import { TermsPage, PrivacyPage, CookiesPage } from "./PolicyPages"
 
 type AuthProps = {
     onLoginSuccess: () => void
 }
 
-/* ── Legal document content for the cinematic background ── */
-const DOC_LAYERS = [
-    {
-        title: "INFORMATION SECURITY POLICY — MASTER ENTERPRISE DOCUMENT",
-        content: [
-            "1. PURPOSE",
-            "This policy establishes the minimum information security requirements for all systems, personnel, and data assets operated under the enterprise framework. Compliance is mandatory.",
-            "2. SCOPE",
-            "Applies to all employees, contractors, consultants, temporary workers, and third-party vendors who access, process, or store company data.",
-            "3. CLASSIFICATION",
-            "Data must be classified as: CONFIDENTIAL | INTERNAL USE ONLY | PUBLIC. Misclassification constitutes a policy violation.",
-            "CONTROL ID: ISP-001 | VERSION: 4.2 | STATUS: ACTIVE",
-            "Next Review: Q4 2026 | Owner: Chief Information Security Officer",
-            "4. ACCESS MANAGEMENT",
-            "Access to information systems must be granted on a strict least privilege basis. All accounts must be protected by multi-factor authentication. Privileged access requires quarterly review.",
-            "5. INCIDENT RESPONSE",
-            "Any suspected security incident or policy violation must be reported immediately to the Global Security Operations Center (GSOC). Refer to the Incident Response Playbook for escalation procedures.",
-            "6. COMPLIANCE OBLIGATIONS",
-            "Failure to adhere to this policy may result in disciplinary action up to and including termination of employment or contract. Exceptions must be documented and approved by the CISO.",
-            "7. PHYSICAL SECURITY",
-            "Physical access to facilities housing sensitive information or IT infrastructure is restricted. Badge access logs are retained for 90 days."
-        ]
-    },
-    {
-        title: "DATA PROTECTION STANDARD — GLOBAL PRIVACY FRAMEWORK",
-        content: [
-            "ARTICLE 1 — DATA CLASSIFICATION FRAMEWORK",
-            "All electronic information assets shall be classified at the point of creation. Classification determines handling, storage, transmission, and disposal requirements.",
-            "ARTICLE 2 — RETENTION REQUIREMENTS",
-            "Electronic records must be retained in strict accordance with the Global Retention Schedule v2026.1. Financial records: 7 years. HR records: 5 years.",
-            "ARTICLE 3 — THIRD PARTY OBLIGATIONS",
-            "Any vendor or subprocessor receiving personal data must execute a Data Processing Agreement prior to receiving access. Annual compliance audits are required.",
-            "POLICY ID: DPS-2026 | EFFECTIVE: JAN 1, 2026",
-            "ARTICLE 4 — ENCRYPTION STANDARDS",
-            "All personal data must be encrypted in transit and at rest using approved cryptographic algorithms. Passwords must be hashed using Argon2id or equivalent.",
-            "ARTICLE 5 — CROSS-BORDER TRANSFERS",
-            "Transfer of personal data across jurisdictions is strictly prohibited unless explicit consent has been obtained and a valid transfer mechanism is in place.",
-            "ARTICLE 6 — DATA SUBJECT RIGHTS",
-            "Requests for data access, rectification, or erasure must be fulfilled within 30 days of receipt to comply with global privacy regulations."
-        ]
-    },
-    {
-        title: "COMPLIANCE CONTROL REGISTER — QUARTERLY REVIEW",
-        content: [
-            "CONTROL ID: SEC-01 | CATEGORY: Encryption",
-            "REQUIREMENT: Strong encryption (AES-256 or equivalent) must be applied to all data at rest and in transit. TLS 1.3 minimum for all external connections.",
-            "CONTROL ID: ACC-07 | CATEGORY: Access Control",
-            "REQUIREMENT: Role-based access control (RBAC) must be implemented. Privileged access review required quarterly.",
-            "CONTROL ID: AUD-12 | CATEGORY: Audit Logging",
-            "REQUIREMENT: All system access events must be logged with user, timestamp, action, and outcome. Logs retained 12 months minimum.",
-            "STATUS: ACTIVE | LAST AUDIT: JUL 2026 | NEXT REVIEW: Q4 2026",
-            "CONTROL ID: BCP-02 | CATEGORY: Business Continuity",
-            "REQUIREMENT: Annual disaster recovery testing is mandatory. RTO: 4 hours. RPO: 1 hour.",
-            "CONTROL ID: VUL-04 | CATEGORY: Vulnerability Management",
-            "REQUIREMENT: Critical vulnerabilities must be patched within 7 days. High vulnerabilities within 30 days.",
-            "CONTROL ID: IAM-09 | CATEGORY: Identity Management",
-            "REQUIREMENT: Segregation of duties must be enforced for all critical financial applications."
-        ]
-    },
-    {
-        title: "INVESTIGATION FINDINGS REPORT — CASE REF: INV-2026-0847",
-        content: [
-            "CASE REFERENCE: INV-2026-0847",
-            "SUBJECT: Potential breach of data handling procedures — Finance division.",
-            "FINDING 1: Evidence suggests unauthorized data export occurred between 14–16 Aug 2026. Affected records: ~2,400 customer profiles.",
-            "FINDING 2: Access logs confirm three separate user accounts accessed restricted export functions outside of normal business hours.",
-            "RECOMMENDATION: Immediate suspension of affected accounts. Full forensic review. Mandatory re-training for all Finance data handlers.",
-            "CLASSIFICATION: CONFIDENTIAL | DISTRIBUTION: RESTRICTED",
-            "FINDING 3: The exported data was transmitted to an unapproved external cloud storage provider via an anomalous outbound HTTPS connection.",
-            "FINDING 4: Data loss prevention (DLP) controls were bypassed using fragmented archiving techniques.",
-            "ACTION PLAN: Implement strict DLP rules blocking all external cloud storage domains. Enhance endpoint monitoring for archiving utilities.",
-            "STATUS: ONGOING | LEAD INVESTIGATOR: T. ALVERSON"
-        ]
-    }
+const VIDEO_ASSET_VERSION = "2"
+
+const VIDEO_SOURCES = [
+    `/videos/law1.mp4?v=${VIDEO_ASSET_VERSION}`,
+    `/videos/law2.mp4?v=${VIDEO_ASSET_VERSION}`,
+    `/videos/law3.mp4?v=${VIDEO_ASSET_VERSION}`
 ]
 
-function AuthBackground({ reduceMotion }: { reduceMotion: boolean }) {
-    const overlayRef = useRef<HTMLDivElement>(null)
-    const mouse = useRef({ x: -9999, y: -9999, entered: false })
-    const smooth = useRef({ x: -9999, y: -9999 })
-    const rafRef = useRef<number | null>(null)
-    const [activeDoc, setActiveDoc] = useState(0)
+export default function Auth({ onLoginSuccess }: AuthProps) {
+    const [loginStage, setLoginStage] = useState<'initial' | 'providers' | 'email' | 'mfa' | 'email-otp' | 'email-otp-verify'>('initial')
+    const [policyRoute, setPolicyRoute] = useState<'terms' | 'privacy' | 'cookies' | null>(null)
+    const [email, setEmail] = useState("")
+    const [fullName, setFullName] = useState("")
+    const [password, setPassword] = useState("")
+    const [mfaToken, setMfaToken] = useState("")
+    const [mfaCode, setMfaCode] = useState("")
+    const [otpCode, setOtpCode] = useState("")
+    const [resendCooldown, setResendCooldown] = useState(0)
+    const [message, setMessage] = useState("")
+    const [isRegistering, setIsRegistering] = useState(false)
+    const [authLoading, setAuthLoading] = useState<string | null>(null)
+    const [isDarkBackground, setIsDarkBackground] = useState(true)
+    const [activeVideoIndex, setActiveVideoIndex] = useState(0)
+    const [autoplayFailed, setAutoplayFailed] = useState(false)
 
-    const RADIUS = 320  // px
-
-    useEffect(() => {
-        if (reduceMotion) return
-        const interval = setInterval(() => {
-            setActiveDoc(prev => (prev + 1) % DOC_LAYERS.length)
-        }, 3000)
-        return () => clearInterval(interval)
-    }, [reduceMotion])
-
-    const buildGradient = (x: number, y: number, entered: boolean) => {
-        if (!entered) {
-            return `rgba(249,250,251,1)` // Light warm gray base
-        }
-        return [
-            `radial-gradient(circle ${RADIUS}px at ${x}px ${y}px,`,
-            `  rgba(251,198,72,0.18)  0%,`, // OpusLex Yellow core (UV illumination)
-            `  rgba(251,198,72,0.08) 35%,`,
-            `  rgba(249,250,251,0.5) 60%,`,
-            `  rgba(249,250,251,0.85) 80%,`,
-            `  rgba(249,250,251,1) 100%`,
-            `)`
-        ].join(" ")
-    }
-
-    const animate = useCallback(() => {
-        const lf = 0.085
-        smooth.current.x += (mouse.current.x - smooth.current.x) * lf
-        smooth.current.y += (mouse.current.y - smooth.current.y) * lf
-
-        if (overlayRef.current) {
-            overlayRef.current.style.background = buildGradient(
-                smooth.current.x,
-                smooth.current.y,
-                mouse.current.entered
-            )
-        }
-        rafRef.current = requestAnimationFrame(animate)
-    }, [])
+    const videoRef = useRef<HTMLVideoElement>(null)
+    const canvasRef = useRef<HTMLCanvasElement>(null)
+    const [isGsiLoaded, setIsGsiLoaded] = useState(false)
+    const [isAppleSdkLoaded, setIsAppleSdkLoaded] = useState(false)
+    const googleButtonRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
-        if (reduceMotion) {
-            if (overlayRef.current) {
-                overlayRef.current.style.background = "rgba(249,250,251,1)"
+        if (resendCooldown > 0) {
+            const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [resendCooldown]);
+
+    useEffect(() => {
+        if (loginStage === 'providers' && isGsiLoaded && googleButtonRef.current) {
+            const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+            if (!clientId) {
+                setMessage("Google Client ID is not configured.");
+                return;
             }
-            return
+            // @ts-ignore
+            if (window.google && window.google.accounts) {
+                // @ts-ignore
+                window.google.accounts.id.renderButton(
+                    googleButtonRef.current,
+                    { theme: "outline", size: "large", shape: "pill", width: 312 }
+                );
+            }
+        }
+    }, [loginStage, isGsiLoaded]);
+
+    // Load Google Identity Services script
+    useEffect(() => {
+        const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+        const initGsi = () => {
+            if (!clientId) {
+                setIsGsiLoaded(true);
+                return;
+            }
+            // @ts-ignore
+            if (window.google && window.google.accounts) {
+                // @ts-ignore
+                window.google.accounts.id.initialize({
+                    client_id: clientId,
+                    callback: handleGoogleCredential,
+                    ux_mode: "popup"
+                });
+                setIsGsiLoaded(true);
+            }
+        };
+
+        const existingScript = document.getElementById("gsi-client-script");
+        if (existingScript) {
+            // @ts-ignore
+            if (window.google) initGsi();
+            else existingScript.addEventListener("load", initGsi);
+            return;
         }
 
-        const onMove = (e: MouseEvent) => {
-            mouse.current.x = e.clientX
-            mouse.current.y = e.clientY
-            mouse.current.entered = true
-        }
-        const onLeave = () => {
-            mouse.current.entered = false
+        const script = document.createElement("script");
+        script.id = "gsi-client-script";
+        script.src = "https://accounts.google.com/gsi/client";
+        script.async = true;
+        script.defer = true;
+        script.onload = initGsi;
+        document.head.appendChild(script);
+    }, []);
+
+    // Load Apple Identity Services script
+    useEffect(() => {
+        const clientId = import.meta.env.VITE_APPLE_CLIENT_ID;
+
+        const initApple = () => {
+            if (!clientId) {
+                setIsAppleSdkLoaded(true);
+                return;
+            }
+            // @ts-ignore
+            if (window.AppleID && window.AppleID.auth) {
+                // @ts-ignore
+                window.AppleID.auth.init({
+                    clientId: clientId,
+                    scope: 'name email',
+                    redirectURI: window.location.origin,
+                    usePopup: true
+                });
+                setIsAppleSdkLoaded(true);
+            }
+        };
+
+        const existingScript = document.getElementById("apple-auth-script");
+        if (existingScript) {
+            // @ts-ignore
+            if (window.AppleID) initApple();
+            else existingScript.addEventListener("load", initApple);
+            return;
         }
 
-        window.addEventListener("mousemove", onMove, { passive: true })
-        window.addEventListener("mouseleave", onLeave, { passive: true })
-        rafRef.current = requestAnimationFrame(animate)
+        const script = document.createElement("script");
+        script.id = "apple-auth-script";
+        script.src = "https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js";
+        script.async = true;
+        script.defer = true;
+        script.onload = initApple;
+        document.head.appendChild(script);
+    }, []);
+
+    const reduceMotion = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
+
+    // Configure video for maximum Safari compatibility and provide one fallback play attempt
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video) return;
+
+        // Establish strict properties before any programmatic interaction
+        video.muted = true;
+        video.defaultMuted = true;
+        video.playsInline = true;
+
+        // Provide a single controlled fallback if declarative autoplay fails
+        const ensurePlayback = async () => {
+            if (video.paused) {
+                try {
+                    await video.play();
+                } catch (error: any) {
+                    console.warn("Background video autoplay was blocked", error);
+                    if (error.name === 'NotAllowedError') {
+                        setAutoplayFailed(true);
+                    }
+                }
+            }
+        };
+
+        ensurePlayback();
+    }, [activeVideoIndex]);
+
+    // Handle user interaction fallback for Safari
+    useEffect(() => {
+        if (!autoplayFailed) return;
+
+        const handleUserInteraction = () => {
+            const video = videoRef.current;
+            if (!video) return;
+
+            const playPromise = video.play();
+
+            if (playPromise !== undefined) {
+                playPromise
+                    .then(() => {
+                        setAutoplayFailed(false);
+                    })
+                    .catch(() => {
+                        // Ignore subsequent failures, leave poster displayed
+                    });
+            } else {
+                setAutoplayFailed(false);
+            }
+
+            document.removeEventListener('click', handleUserInteraction, true);
+            document.removeEventListener('touchend', handleUserInteraction, true);
+            document.removeEventListener('keydown', handleUserInteraction, true);
+        };
+
+        document.addEventListener('click', handleUserInteraction, true);
+        document.addEventListener('touchend', handleUserInteraction, true);
+        document.addEventListener('keydown', handleUserInteraction, true);
 
         return () => {
-            window.removeEventListener("mousemove", onMove)
-            window.removeEventListener("mouseleave", onLeave)
-            if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
+            document.removeEventListener('click', handleUserInteraction, true);
+            document.removeEventListener('touchend', handleUserInteraction, true);
+            document.removeEventListener('keydown', handleUserInteraction, true);
+        };
+    }, [autoplayFailed]);
+
+    // Video luminance detection
+    useEffect(() => {
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        if (!video || !canvas) return;
+
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) return;
+
+        let animationFrameId: number;
+        let lastSampleTime = 0;
+
+        const sampleLuminance = (timestamp: number) => {
+            if (timestamp - lastSampleTime > 500) {
+                lastSampleTime = timestamp;
+                if (video.readyState >= 2) {
+                    try {
+                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                        const data = imageData.data;
+                        let r = 0, g = 0, b = 0;
+                        for (let i = 0; i < data.length; i += 4) {
+                            r += data[i];
+                            g += data[i + 1];
+                            b += data[i + 2];
+                        }
+                        const pixels = data.length / 4;
+                        const luminance = (0.2126 * (r / pixels) + 0.7152 * (g / pixels) + 0.0722 * (b / pixels));
+
+                        // Hysteresis
+                        setIsDarkBackground(prev => {
+                            if (luminance < 110) return true;
+                            if (luminance > 140) return false;
+                            return prev;
+                        });
+                    } catch (e) {
+                        // Ignore CORS or canvas errors safely
+                    }
+                }
+            }
+            animationFrameId = requestAnimationFrame(sampleLuminance);
+        };
+
+        animationFrameId = requestAnimationFrame(sampleLuminance);
+        return () => cancelAnimationFrame(animationFrameId);
+    }, [activeVideoIndex]);
+
+    const handleSendOtp = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        if (!email.trim()) {
+            setMessage("Please enter an email address.");
+            return;
         }
-    }, [reduceMotion, animate])
+        setMessage("Sending verification code…");
+        setAuthLoading("email-otp");
+        try {
+            const response = await fetch("http://127.0.0.1:8000/api/v1/auth/email-otp/send", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: email.trim() }),
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                if (response.status === 429) {
+                    setMessage("Too many requests. Please wait before requesting another code.");
+                } else {
+                    setMessage(data.detail || "Failed to send verification code.");
+                }
+                return;
+            }
+            setMessage("Verification code sent.");
+            setOtpCode("");
+            setResendCooldown(60);
+            setLoginStage('email-otp-verify');
+        } catch {
+            setMessage("Unable to connect to the backend");
+        } finally {
+            setAuthLoading(null);
+        }
+    };
+
+    const handleVerifyOtp = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        if (otpCode.trim().length !== 6) {
+            setMessage("Please enter a 6-digit verification code.");
+            return;
+        }
+        setMessage("Verifying code…");
+        setAuthLoading("email-otp-verify");
+        try {
+            const response = await fetch("http://127.0.0.1:8000/api/v1/auth/email-otp/verify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: email.trim(), code: otpCode.trim() }),
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                if (response.status === 429) {
+                    setMessage("Too many requests. Please wait before requesting another code.");
+                } else {
+                    setMessage("Invalid or expired verification code.");
+                }
+                return;
+            }
+            if (data.mfa_required) {
+                setMfaToken(data.mfa_token);
+                setMfaCode("");
+                setMessage("");
+                setLoginStage('mfa');
+                return;
+            }
+            localStorage.setItem("access_token", data.access_token);
+            localStorage.setItem("current_user", JSON.stringify(data.user));
+            setMessage(`Welcome, ${data.user.full_name || data.user.email}!`);
+            onLoginSuccess();
+        } catch {
+            setMessage("Unable to connect to the backend");
+        } finally {
+            setAuthLoading(null);
+        }
+    };
+
+    const handleLogin = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        setMessage("Signing in…");
+        setAuthLoading("email");
+        try {
+            const response = await fetch("http://127.0.0.1:8000/api/v1/auth/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, password }),
+            });
+            const data = await response.json();
+            if (!response.ok) { setMessage(data.detail || "Login failed"); return; }
+
+            if (data.mfa_required) {
+                setMfaToken(data.mfa_token);
+                setMfaCode("");
+                setMessage("");
+                setLoginStage('mfa');
+                return;
+            }
+
+            localStorage.setItem("access_token", data.access_token);
+            localStorage.setItem("current_user", JSON.stringify(data.user));
+            setMessage(`Welcome, ${data.user.full_name || data.user.email}!`);
+            onLoginSuccess();
+        } catch {
+            setMessage("Unable to connect to the backend");
+        } finally {
+            setAuthLoading(null);
+        }
+    };
+
+    const handleMfaVerify = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        if (mfaCode.trim().length !== 6) {
+            setMessage("Please enter a 6-digit authentication code.");
+            return;
+        }
+        setMessage("Verifying code…");
+        setAuthLoading("mfa");
+        try {
+            const response = await fetch("http://127.0.0.1:8000/api/v1/auth/login/mfa", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ mfa_token: mfaToken, code: mfaCode.trim() }),
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                setMessage(data.detail || "Invalid verification code.");
+                return;
+            }
+            localStorage.setItem("access_token", data.access_token);
+            localStorage.setItem("current_user", JSON.stringify(data.user));
+            setMessage(`Welcome, ${data.user.full_name || data.user.email}!`);
+            onLoginSuccess();
+        } catch {
+            setMessage("Unable to connect to the backend");
+        } finally {
+            setAuthLoading(null);
+        }
+    };
+
+    const handleRegister = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        setMessage("Creating account…");
+        setAuthLoading("email");
+        try {
+            const response = await fetch("http://127.0.0.1:8000/api/v1/auth/register", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, password, full_name: fullName }),
+            });
+            const data = await response.json();
+            if (!response.ok) { setMessage(data.detail || "Registration failed"); return; }
+            setMessage("Account created successfully!");
+            setIsRegistering(false);
+            setFullName("");
+            setPassword("");
+        } catch {
+            setMessage("Unable to connect to the backend");
+        } finally {
+            setAuthLoading(null);
+        }
+    };
+
+    const handleGoogleCredential = async (response: any) => {
+        // @ts-ignore
+        window.__handleGoogleCredential = handleGoogleCredential;
+        if (!response.credential) {
+            setMessage("Google Sign-In failed.");
+            setAuthLoading(null);
+            return;
+        }
+        try {
+            const res = await fetch("http://127.0.0.1:8000/api/v1/auth/google", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id_token: response.credential }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                setMessage(data.detail || "Google Sign-In failed.");
+                setAuthLoading(null);
+                return;
+            }
+            if (data.mfa_required) {
+                setMfaToken(data.mfa_token);
+                setMfaCode("");
+                setMessage("");
+                setLoginStage('mfa');
+                setAuthLoading(null);
+                return;
+            }
+            localStorage.setItem("access_token", data.access_token);
+            localStorage.setItem("current_user", JSON.stringify(data.user));
+            setMessage(`Welcome, ${data.user.full_name || data.user.email}!`);
+            onLoginSuccess();
+        } catch {
+            setMessage("Unable to connect to the backend");
+            setAuthLoading(null);
+        }
+    };
+
+    const handleAppleSignIn = async () => {
+        if (!isAppleSdkLoaded) return;
+        try {
+            // @ts-ignore
+            const response = await window.AppleID.auth.signIn();
+            await handleAppleCredential(response);
+        } catch (error) {
+            // Error typically occurs when user cancels
+            setMessage("Apple Sign-In cancelled or failed.");
+        }
+    };
+
+    const handleAppleCredential = async (response: any) => {
+        if (!response.authorization || !response.authorization.id_token) {
+            setMessage("Apple Sign-In failed.");
+            setAuthLoading(null);
+            return;
+        }
+
+        let payload: any = { id_token: response.authorization.id_token };
+        if (response.user) {
+            try {
+                const userObj = typeof response.user === 'string' ? JSON.parse(response.user) : response.user;
+                if (userObj.name) {
+                    payload.first_name = userObj.name.firstName;
+                    payload.last_name = userObj.name.lastName;
+                }
+            } catch (e) {
+            }
+        }
+
+        try {
+            const res = await fetch("http://127.0.0.1:8000/api/v1/auth/apple", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                setMessage(data.detail || "Apple Sign-In failed.");
+                setAuthLoading(null);
+                return;
+            }
+            if (data.mfa_required) {
+                setMfaToken(data.mfa_token);
+                setMfaCode("");
+                setMessage("");
+                setLoginStage('mfa');
+                setAuthLoading(null);
+                return;
+            }
+            localStorage.setItem("access_token", data.access_token);
+            localStorage.setItem("current_user", JSON.stringify(data.user));
+            setMessage(`Welcome, ${data.user.full_name || data.user.email}!`);
+            onLoginSuccess();
+        } catch {
+            setMessage("Unable to connect to the backend");
+            setAuthLoading(null);
+        }
+    };
+
+    if (policyRoute === 'terms') return <TermsPage onBack={() => setPolicyRoute(null)} />
+    if (policyRoute === 'privacy') return <PrivacyPage onBack={() => setPolicyRoute(null)} />
+    if (policyRoute === 'cookies') return <CookiesPage onBack={() => setPolicyRoute(null)} />
+
+    const textColorClass = isDarkBackground ? "text-white" : "text-neutral-900";
+    const secondaryTextColorClass = isDarkBackground ? "text-white/80" : "text-neutral-800/80";
+    const vignetteClass = isDarkBackground ? "from-black/80 via-black/40 to-transparent" : "from-white/90 via-white/50 to-transparent";
+
+    const primaryButtonClass = "w-full rounded-full py-4 text-[15px] font-semibold transition-all active:scale-[0.98] bg-white text-black shadow-[0_4px_20px_rgba(0,0,0,0.15)] flex items-center justify-center gap-2 hover:bg-neutral-50";
 
     return (
-        <div
-            className="absolute inset-0 overflow-hidden"
-            style={{ background: "#f9fafb" }} // Light base
-        >
-            {/* ── [2] Document layers — slideshow ── */}
-            {DOC_LAYERS.map((doc, i) => (
-                <div
-                    key={i}
-                    className="absolute inset-0 flex items-center justify-center transition-opacity duration-1000"
-                    style={{
-                        opacity: i === activeDoc ? 0.65 : 0,
-                        pointerEvents: "none"
-                    }}
-                >
-                    <DocLayer
-                        doc={doc}
-                        animate={false}
-                        className=""
-                        style={{ width: "120%", height: "120%", left: "-10%", top: "-10%" }}
-                        scale={1.2}
+        <div className="relative flex flex-col h-screen w-full overflow-hidden transition-colors duration-700 bg-neutral-900">
+            {/* Background Videos */}
+            <div className="absolute inset-0 z-0 bg-neutral-900">
+                {!reduceMotion && (
+                    <video
+                        key={VIDEO_SOURCES[activeVideoIndex]}
+                        ref={videoRef}
+                        src={VIDEO_SOURCES[activeVideoIndex]}
+                        autoPlay
+                        muted
+                        playsInline
+                        preload="auto"
+                        controls={false}
+                        onEnded={() => setActiveVideoIndex(prev => (prev + 1) % VIDEO_SOURCES.length)}
+                        onError={() => setActiveVideoIndex(prev => (prev + 1) % VIDEO_SOURCES.length)}
+                        className={`absolute inset-0 object-cover w-full h-full transition-opacity duration-700 ease-in-out ${autoplayFailed ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
                     />
-                </div>
-            ))}
+                )}
 
-            {/* ── [3] Fixed radial vignette (edge darkening, always on) ── */}
-            <div
-                className="absolute inset-0 pointer-events-none"
-                style={{
-                    background: "radial-gradient(ellipse 100% 80% at 50% 50%, transparent 0%, rgba(243,244,246,0.5) 60%, rgba(229,231,235,0.9) 100%)",
-                }}
-            />
+                {(reduceMotion || autoplayFailed) && (
+                    <img
+                        src="/videos/law1_poster.jpg"
+                        alt="OpusLex Background"
+                        className="absolute inset-0 object-cover w-full h-full"
+                    />
+                )}
 
-            {/* ── [4] THE REVEAL OVERLAY — updated by rAF via style.background ── */}
-            <div
-                ref={overlayRef}
-                className="absolute inset-0 pointer-events-none"
-                style={{ background: "#f9fafb" }}
-            />
+                {/* Dynamic Bottom Vignette ONLY */}
+                <div className={`absolute bottom-0 left-0 right-0 h-3/5 z-10 bg-gradient-to-t pointer-events-none transition-colors duration-700 ease-in-out ${vignetteClass}`} />
 
-            {/* ── Footer ── */}
-            <div
-                className="absolute bottom-4 left-0 right-0 text-center pointer-events-none"
-                style={{
-                    fontSize: "0.6rem",
-                    letterSpacing: "0.18em",
-                    color: "rgba(107,114,128,0.6)", // gray-500
-                    zIndex: 5,
-                }}
-            >
-                © {new Date().getFullYear()} OPUSLEX — ENTERPRISE ACCESS ONLY
+                <canvas ref={canvasRef} width={8} height={8} className="hidden" />
             </div>
-        </div>
-    )
-}
 
-function DocLayer({
-    doc, animate: shouldAnimate, className, style, scale,
-}: {
-    doc: typeof DOC_LAYERS[0]
-    animate: boolean
-    className: string
-    style: React.CSSProperties
-    scale: number
-}) {
-    return (
-        <div
-            className={`absolute pointer-events-none select-none${shouldAnimate ? ` ${className}` : ""}`}
-            style={style}
-        >
-            <DocCard doc={doc} scale={scale} />
-        </div>
-    )
-}
+            {/* Content Container */}
+            <div className={`relative z-20 flex flex-col flex-1 w-full h-full safe-area-pt safe-area-pb transition-colors duration-700 ease-in-out ${textColorClass}`}>
 
-function DocCard({ doc, scale }: { doc: typeof DOC_LAYERS[0]; scale: number }) {
-    return (
-        <div
-            style={{
-                width: "100%",
-                height: "100%",
-                background: "linear-gradient(135deg, #ffffff 0%, #f9fafb 55%, #f3f4f6 100%)",
-                padding: `${scale * 40}px ${scale * 60}px`,
-                fontFamily: "'SF Mono', 'Fira Code', 'Courier New', monospace",
-                boxShadow: "0 12px 80px rgba(0,0,0,0.05)",
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "center",
-            }}
-        >
-            <div style={{
-                fontSize: "1.2rem",
-                letterSpacing: "0.28em",
-                color: "rgba(55,65,81,0.85)", // slate-700
-                borderBottom: "1px solid rgba(0,0,0,0.08)",
-                paddingBottom: `${scale * 14}px`,
-                marginBottom: `${scale * 24}px`,
-                fontWeight: 700,
-                textTransform: "uppercase",
-            }}>
-                {doc.title}
-            </div>
-            {doc.content.map((line, i) => (
-                <div key={i} style={{
-                    fontSize: i % 2 === 0 ? "1.0rem" : "0.9rem",
-                    color: i % 2 === 0 ? "rgba(71,85,105,0.9)" : "rgba(100,116,139,0.7)", // slate text
-                    fontWeight: i % 2 === 0 ? 600 : 400,
-                    marginTop: i % 2 === 0 ? `${scale * 16}px` : "6px",
-                    lineHeight: 1.65,
-                    letterSpacing: i % 2 === 0 ? "0.1em" : "0.03em",
-                }}>
-                    {line}
+                {/* Header (Logo & Tagline) */}
+                <div className="flex flex-col items-center pt-16 sm:pt-24 px-6 animate-in fade-in slide-in-from-top-4 duration-700">
+                    <div className="transition-all duration-700">
+                         <div className="relative flex justify-center items-center w-[220px]">
+                            <img src={logoWhite} alt="OpusLex Logo" className={`w-full h-auto transition-opacity duration-700 ${isDarkBackground ? 'opacity-100' : 'opacity-0 absolute'}`} />
+                            <img src={logoLight} alt="OpusLex Logo" className={`w-full h-auto transition-opacity duration-700 ${!isDarkBackground ? 'opacity-100' : 'opacity-0 absolute'}`} />
+                        </div>
+                    </div>
+                    <p className={`mt-5 text-[13px] font-medium tracking-wide text-center transition-colors duration-700 ${textColorClass} ${isDarkBackground ? 'drop-shadow-md' : ''}`}>
+                        Beyond books - instant legal clarity.
+                    </p>
                 </div>
-            ))}
+
+                <div className="flex-1" />
+
+                {/* Main Auth Actions */}
+                <div className="w-full max-w-[360px] mx-auto px-6 pb-12 sm:pb-16 flex flex-col items-center">
+
+                    {loginStage === 'initial' && (
+                        <div className="w-full flex flex-col items-center animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            <p className={`text-[11px] sm:text-[12px] text-center mb-6 leading-relaxed font-medium transition-colors duration-700 ${secondaryTextColorClass} ${isDarkBackground ? 'drop-shadow-sm' : ''}`}>
+                                By tapping Sign in or Create account, you agree to our{' '}
+                                <button onClick={() => setPolicyRoute('terms')} className="font-bold underline decoration-1 underline-offset-2 hover:opacity-70 transition-opacity">Terms of Service</button>.
+                                Learn how we process your data in our{' '}
+                                <button onClick={() => setPolicyRoute('privacy')} className="font-bold underline decoration-1 underline-offset-2 hover:opacity-70 transition-opacity">Privacy Policy</button> and{' '}
+                                <button onClick={() => setPolicyRoute('cookies')} className="font-bold underline decoration-1 underline-offset-2 hover:opacity-70 transition-opacity">Cookies Policy</button>.
+                            </p>
+
+                            <button
+                                onClick={() => { setLoginStage('email'); setIsRegistering(true); setMessage(""); }}
+                                className={primaryButtonClass}
+                            >
+                                Create account
+                            </button>
+
+                            <div className={`mt-7 flex items-center justify-center gap-3 text-[14px] font-bold tracking-wide transition-colors duration-700 ${textColorClass}`}>
+                                <button
+                                    onClick={() => { setLoginStage('providers'); setMessage(""); }}
+                                    className="hover:opacity-70 transition-opacity"
+                                >
+                                    Sign in
+                                </button>
+                                <span className="opacity-50 font-normal">|</span>
+                                <button
+                                    onClick={() => { setLoginStage('email'); setIsRegistering(false); setMessage(""); }}
+                                    className="hover:opacity-70 transition-opacity"
+                                >
+                                    Log in
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {loginStage === 'providers' && (
+                        <div className="w-full flex flex-col items-center animate-in fade-in slide-in-from-right-4 duration-400">
+                            <div className="w-full space-y-3 mb-6">
+                                <ProviderButton
+                                    icon={<span className="text-xl"></span>}
+                                    label="Sign in with Apple"
+                                    onClick={handleAppleSignIn}
+                                />
+                                <div className="w-full flex justify-center items-center min-h-[44px]">
+                                    <div ref={googleButtonRef} className="w-full flex justify-center"></div>
+                                </div>
+                                <ProviderButton
+                                    icon={<Mail size={20} strokeWidth={1.5} />}
+                                    label="Sign in with Email Code"
+                                    onClick={() => {
+                                        setLoginStage('email-otp');
+                                        setMessage("");
+                                    }}
+                                />
+                                <ProviderButton
+                                    icon={<Smartphone size={20} strokeWidth={1.5} />}
+                                    label="Sign in with phone number"
+                                />
+                            </div>
+
+                            <button
+                                onClick={() => setLoginStage('initial')}
+                                className={`text-[14px] font-bold hover:opacity-70 transition-opacity flex items-center gap-1.5 ${textColorClass}`}
+                            >
+                                <ArrowLeft size={16} />
+                                Back
+                            </button>
+                        </div>
+                    )}
+
+                    {loginStage === 'email' && (
+                        <div className="w-full flex flex-col items-center animate-in fade-in slide-in-from-right-4 duration-400">
+
+                            <form onSubmit={isRegistering ? handleRegister : handleLogin} className="w-full flex flex-col gap-3 mb-6">
+                                {isRegistering && (
+                                    <AuthField type="text" placeholder="Enter your full name" value={fullName} onChange={setFullName} />
+                                )}
+                                <AuthField type="email" placeholder="name@company.com" value={email} onChange={setEmail} />
+                                <AuthField type="password" placeholder="Enter password" value={password} onChange={setPassword} />
+
+                                <button
+                                    type="submit"
+                                    disabled={authLoading === "email"}
+                                    className={`${primaryButtonClass} mt-2`}
+                                >
+                                    {authLoading === "email" && <Loader2 size={16} className="animate-spin text-black" />}
+                                    {authLoading === "email" ? "Processing..." : (isRegistering ? "Create account" : "Log in")}
+                                </button>
+                            </form>
+
+                            {!isRegistering && (
+                                <button
+                                    onClick={() => { setLoginStage('email-otp'); setMessage(""); }}
+                                    className={`mb-6 text-[14px] font-bold hover:opacity-70 transition-opacity ${textColorClass}`}
+                                >
+                                    Log in with Email Code
+                                </button>
+                            )}
+
+                            <button
+                                onClick={() => { setLoginStage('initial'); setMessage(""); setIsRegistering(false); }}
+                                className={`text-[14px] font-bold hover:opacity-70 transition-opacity flex items-center gap-1.5 ${textColorClass}`}
+                            >
+                                <ArrowLeft size={16} />
+                                Back
+                            </button>
+
+                            {message && (
+                                <div className={`mt-5 p-3 rounded-xl text-xs w-full text-center font-bold ${
+                                    message.includes("success") || message.includes("Welcome") || message.includes("sent")
+                                        ? "bg-green-100 text-green-800"
+                                        : "bg-red-100 text-red-800"
+                                }`}>
+                                    {message}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {loginStage === 'email-otp' && (
+                        <div className="w-full flex flex-col items-center animate-in fade-in slide-in-from-right-4 duration-400">
+                            <div className="text-center mb-5">
+                                <h3 className={`text-lg font-bold ${textColorClass}`}>Log in with Email Code</h3>
+                                <p className={`mt-1.5 text-[12px] leading-relaxed font-medium transition-colors duration-700 ${secondaryTextColorClass}`}>
+                                    We'll send a 6-digit code to your email.
+                                </p>
+                            </div>
+
+                            <form onSubmit={handleSendOtp} className="w-full flex flex-col gap-3 mb-6">
+                                <AuthField type="email" placeholder="name@company.com" value={email} onChange={setEmail} />
+
+                                <button
+                                    type="submit"
+                                    disabled={authLoading === "email-otp"}
+                                    className={`${primaryButtonClass} mt-2`}
+                                >
+                                    {authLoading === "email-otp" && <Loader2 size={16} className="animate-spin text-black" />}
+                                    {authLoading === "email-otp" ? "Sending..." : "Send Code"}
+                                </button>
+                            </form>
+
+                            <button
+                                onClick={() => { setLoginStage('email'); setMessage(""); }}
+                                className={`text-[14px] font-bold hover:opacity-70 transition-opacity flex items-center gap-1.5 ${textColorClass}`}
+                            >
+                                <ArrowLeft size={16} />
+                                Back
+                            </button>
+
+                            {message && (
+                                <div className={`mt-5 p-3 rounded-xl text-xs w-full text-center font-bold ${
+                                    message.includes("success") || message.includes("Welcome") || message.includes("sent") || message.includes("Sending")
+                                        ? "bg-green-100 text-green-800"
+                                        : "bg-red-100 text-red-800"
+                                }`}>
+                                    {message}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {loginStage === 'email-otp-verify' && (
+                        <div className="w-full flex flex-col items-center animate-in fade-in slide-in-from-right-4 duration-400">
+                            <div className="text-center mb-5">
+                                <h3 className={`text-lg font-bold ${textColorClass}`}>Enter Verification Code</h3>
+                                <p className={`mt-1.5 text-[12px] leading-relaxed font-medium transition-colors duration-700 ${secondaryTextColorClass}`}>
+                                    Code sent to {email}
+                                </p>
+                            </div>
+
+                            <form onSubmit={handleVerifyOtp} className="w-full flex flex-col gap-3 mb-6">
+                                <AuthField
+                                    type="text"
+                                    placeholder="6-digit code (e.g. 123456)"
+                                    value={otpCode}
+                                    onChange={(v) => setOtpCode(v.replace(/\D/g, '').slice(0, 6))}
+                                />
+
+                                <button
+                                    type="submit"
+                                    disabled={authLoading === "email-otp-verify"}
+                                    className={`${primaryButtonClass} mt-2`}
+                                >
+                                    {authLoading === "email-otp-verify" && <Loader2 size={16} className="animate-spin text-black" />}
+                                    {authLoading === "email-otp-verify" ? "Verifying..." : "Verify"}
+                                </button>
+                            </form>
+
+                            <div className="flex flex-col items-center gap-4 w-full">
+                                <button
+                                    onClick={handleSendOtp}
+                                    disabled={resendCooldown > 0 || authLoading === "email-otp"}
+                                    className={`text-[13px] font-bold hover:opacity-70 transition-opacity ${textColorClass} ${resendCooldown > 0 ? "opacity-50" : ""}`}
+                                >
+                                    {resendCooldown > 0 ? `Resend Code in ${resendCooldown}s` : "Resend Code"}
+                                </button>
+
+                                <button
+                                    onClick={() => { setLoginStage('email-otp'); setMessage(""); setOtpCode(""); }}
+                                    className={`text-[14px] font-bold hover:opacity-70 transition-opacity flex items-center gap-1.5 ${textColorClass}`}
+                                >
+                                    <ArrowLeft size={16} />
+                                    Change email
+                                </button>
+                            </div>
+
+                            {message && (
+                                <div className={`mt-5 p-3 rounded-xl text-xs w-full text-center font-bold ${
+                                    message.includes("success") || message.includes("Welcome") || message.includes("sent") || message.includes("Sending") || message.includes("Verifying")
+                                        ? "bg-green-100 text-green-800"
+                                        : "bg-red-100 text-red-800"
+                                }`}>
+                                    {message}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {loginStage === 'mfa' && (
+                        <div className="w-full flex flex-col items-center animate-in fade-in slide-in-from-right-4 duration-400">
+                            <div className="text-center mb-5">
+                                <h3 className={`text-lg font-bold ${textColorClass}`}>Two-factor authentication</h3>
+                                <p className={`mt-1.5 text-[12px] leading-relaxed font-medium transition-colors duration-700 ${secondaryTextColorClass}`}>
+                                    Enter the 6-digit verification code from your authenticator app.
+                                </p>
+                            </div>
+
+                            <form onSubmit={handleMfaVerify} className="w-full flex flex-col gap-3 mb-6">
+                                <AuthField
+                                    type="text"
+                                    placeholder="6-digit code (e.g. 123456)"
+                                    value={mfaCode}
+                                    onChange={(v) => setMfaCode(v.replace(/\D/g, '').slice(0, 6))}
+                                />
+
+                                <button
+                                    type="submit"
+                                    disabled={authLoading === "mfa"}
+                                    className={`${primaryButtonClass} mt-2`}
+                                >
+                                    {authLoading === "mfa" && <Loader2 size={16} className="animate-spin text-black" />}
+                                    {authLoading === "mfa" ? "Verifying..." : "Verify & Continue"}
+                                </button>
+                            </form>
+
+                            <button
+                                onClick={() => { setLoginStage('email'); setMessage(""); setMfaToken(""); setMfaCode(""); }}
+                                className={`text-[14px] font-bold hover:opacity-70 transition-opacity flex items-center gap-1.5 ${textColorClass}`}
+                            >
+                                <ArrowLeft size={16} />
+                                Back to Log in
+                            </button>
+
+                            {message && (
+                                <div className={`mt-5 p-3 rounded-xl text-xs w-full text-center font-bold ${
+                                    message.includes("success") || message.includes("Welcome") || message.includes("sent")
+                                        ? "bg-green-100 text-green-800"
+                                        : "bg-red-100 text-red-800"
+                                }`}>
+                                    {message}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            <style>{`
+                .safe-area-pt { padding-top: env(safe-area-inset-top); }
+                .safe-area-pb { padding-bottom: max(env(safe-area-inset-bottom), 16px); }
+            `}</style>
         </div>
     )
 }
 
-function ProviderButton({ icon, label, onClick, disabled, loading }: { icon: React.ReactNode; label: string; onClick: () => void; disabled?: boolean; loading?: boolean }) {
+function ProviderButton({ icon, label, onClick, disabled }: { icon: React.ReactNode; label: string; onClick?: () => void; disabled?: boolean }) {
     return (
         <button
             type="button"
-            disabled={disabled || loading}
             onClick={onClick}
-            style={{
-                width: "100%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                position: "relative",
-                gap: "10px",
-                background: "#ffffff",
-                color: "#111",
-                border: "1px solid rgba(0,0,0,0.08)",
-                boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
-                borderRadius: "9999px",
-                padding: "12px 16px",
-                fontSize: "0.875rem",
-                fontWeight: 500,
-                cursor: (disabled || loading) ? "not-allowed" : "pointer",
-                opacity: (disabled || loading) ? 0.6 : 1,
-                transition: "all 0.2s ease"
-            }}
-            onMouseEnter={e => {
-                if (!disabled && !loading) {
-                    e.currentTarget.style.background = "#fafafa"
-                    e.currentTarget.style.transform = "translateY(-1px)"
-                }
-            }}
-            onMouseLeave={e => {
-                if (!disabled && !loading) {
-                    e.currentTarget.style.background = "#ffffff"
-                    e.currentTarget.style.transform = ""
-                }
-            }}
+            disabled={disabled}
+            className={`w-full rounded-full py-4 px-6 text-[15px] font-semibold transition-all active:scale-[0.98] bg-white text-black shadow-[0_4px_20px_rgba(0,0,0,0.15)] flex items-center justify-center relative hover:bg-neutral-50 ${disabled ? "opacity-70 pointer-events-none" : ""}`}
         >
-            <span style={{ position: "absolute", left: "16px", display: "flex", alignItems: "center" }}>
-                {loading ? <Loader2 size={18} className="animate-spin" /> : icon}
+            <span className="absolute left-6 flex items-center opacity-90">
+                {icon}
             </span>
-            <span>{loading ? "Connecting..." : label}</span>
+            <span>{label}</span>
+            {!onClick && <span className="absolute right-6 text-[9px] uppercase tracking-wider font-bold opacity-40">Coming Soon</span>}
         </button>
     )
 }
 
-function AuthField({ label, type, placeholder, value, onChange }: {
-    label: string; type: string; placeholder: string; value: string; onChange: (v: string) => void
+function AuthField({ type, placeholder, value, onChange }: {
+    type: string; placeholder: string; value: string; onChange: (v: string) => void
 }) {
     return (
-        <div>
-            <label style={{
-                display: "block", fontSize: "0.8125rem", fontWeight: 500,
-                color: "#4b5563", marginBottom: "6px",
-            }}>
-                {label}
-            </label>
+        <div className="w-full relative">
             <input
                 type={type}
                 placeholder={placeholder}
                 value={value}
                 onChange={e => onChange(e.target.value)}
                 required
-                style={{
-                    width: "100%",
-                    padding: "12px 14px",
-                    background: "#ffffff",
-                    border: "1px solid rgba(0,0,0,0.1)",
-                    borderRadius: "9999px",
-                    color: "#111",
-                    fontSize: "0.875rem",
-                    outline: "none",
-                    transition: "box-shadow 0.15s",
-                }}
-                onFocus={e => (e.target.style.boxShadow = "0 0 0 3px rgba(255,255,255,0.25)")}
-                onBlur={e => (e.target.style.boxShadow = "none")}
+                className="w-full rounded-full py-4 px-6 text-[15px] outline-none transition-all duration-200 focus:ring-2 focus:ring-black/20 bg-white/95 text-black placeholder-neutral-400 shadow-[inset_0_2px_4px_rgba(0,0,0,0.04),0_2px_10px_rgba(0,0,0,0.08)] backdrop-blur-sm font-medium"
             />
         </div>
     )
 }
-
-function Auth({ onLoginSuccess }: AuthProps) {
-    const [loginStage, setLoginStage] = useState<'initial' | 'email'>('initial')
-    const [email, setEmail] = useState("")
-    const [fullName, setFullName] = useState("")
-    const [password, setPassword] = useState("")
-    const [message, setMessage] = useState("")
-    const [isRegistering, setIsRegistering] = useState(false)
-    const [showFaq, setShowFaq] = useState(false)
-    const [authLoading, setAuthLoading] = useState<string | null>(null)
-
-    const reduceMotion =
-        (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) ||
-        localStorage.getItem("pref_reduce_motion") === "true"
-
-    const handleLogin = async (e?: React.FormEvent) => {
-        if (e) e.preventDefault()
-        setMessage("Signing in…")
-        setAuthLoading("email")
-        try {
-            const response = await fetch("http://127.0.0.1:8000/api/v1/auth/login", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, password }),
-            })
-            const data = await response.json()
-            if (!response.ok) { setMessage(data.detail || "Login failed"); return }
-            localStorage.setItem("access_token", data.access_token)
-            localStorage.setItem("current_user", JSON.stringify(data.user))
-            setMessage(`Welcome, ${data.user.full_name}!`)
-            onLoginSuccess()
-        } catch {
-            setMessage("Unable to connect to the backend")
-        } finally {
-            setAuthLoading(null)
-        }
-    }
-
-    const handleRegister = async (e?: React.FormEvent) => {
-        if (e) e.preventDefault()
-        setMessage("Creating account…")
-        setAuthLoading("email")
-        try {
-            const response = await fetch("http://127.0.0.1:8000/api/v1/auth/register", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, password, full_name: fullName }),
-            })
-            const data = await response.json()
-            if (!response.ok) { setMessage(data.detail || "Registration failed"); return }
-            setMessage("Account created successfully!")
-            setIsRegistering(false)
-            setFullName("")
-            setPassword("")
-        } catch {
-            setMessage("Unable to connect to the backend")
-        } finally {
-            setAuthLoading(null)
-        }
-    }
-
-
-
-    return (
-        <div className="relative flex h-screen w-full items-center justify-center overflow-hidden text-neutral-100">
-            {/* ── Cinematic interactive background ── */}
-            <AuthBackground reduceMotion={reduceMotion} />
-
-            {/* ── Login card — z-20 keeps it above the reveal overlay ── */}
-            <div className="relative w-full max-w-[380px] mx-4 flex flex-col transition-all duration-300" style={{ zIndex: 20 }}>
-                <div
-                    style={{
-                        background: "#f3f4f6",
-                        border: "1px solid rgba(0,0,0,0.08)",
-                        borderRadius: "20px",
-                        boxShadow: "0 24px 64px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,1)",
-                        padding: "40px 32px 36px",
-                    }}
-                >
-                    {/* ── Brand lockup ── */}
-                    <div className="flex flex-col items-center mb-8">
-                        <div className="mb-2.5">
-                            <OpusLexBrand variant="dark" className="w-[240px] h-auto" />
-                        </div>
-                        <p style={{
-                            color: "#111",
-                            fontSize: "0.8125rem",
-                            letterSpacing: "0.04em",
-                            textAlign: "center",
-                            margin: 0,
-                            fontWeight: 500,
-                        }}>
-                            Legal &amp; Compliance Intelligence
-                        </p>
-                    </div>
-
-                    <div className="transition-all duration-300 relative">
-                        {loginStage === 'initial' && (
-                            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "24px" }}>
-                                    <ProviderButton
-                                        icon={
-                                            <svg width="18" height="18" viewBox="0 0 24 24" style={{ filter: "grayscale(100%)", opacity: 0.6 }}>
-                                                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                                                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                                                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-                                                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-                                            </svg>
-                                        }
-                                        label="Google (Coming Soon)"
-                                        onClick={() => {}}
-                                        disabled={true}
-                                    />
-                                    <ProviderButton
-                                        icon={<span style={{ fontSize: "18px", lineHeight: 1, opacity: 0.6, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}></span>}
-                                        label="Apple (Coming Soon)"
-                                        onClick={() => {}}
-                                        disabled={true}
-                                    />
-                                    <ProviderButton
-                                        icon={<Smartphone size={18} strokeWidth={1.5} style={{ opacity: 0.6 }} />}
-                                        label="Phone (Coming Soon)"
-                                        onClick={() => {}}
-                                        disabled={true}
-                                    />
-                                </div>
-
-                                <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
-                                    <div style={{ flex: 1, height: "1px", background: "rgba(0,0,0,0.06)" }} />
-                                    <span style={{ fontSize: "0.625rem", color: "#6b7280", letterSpacing: "0.2em", fontWeight: 600 }}>OR</span>
-                                    <div style={{ flex: 1, height: "1px", background: "rgba(0,0,0,0.06)" }} />
-                                </div>
-
-                                <ProviderButton
-                                    icon={<Mail size={18} strokeWidth={1.5} />}
-                                    label="Continue with email"
-                                    onClick={() => { setLoginStage('email'); setMessage(""); }}
-                                />
-                            </div>
-                        )}
-
-                        {loginStage === 'email' && (
-                            <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-                                <button
-                                    onClick={() => { setLoginStage('initial'); setMessage(""); setIsRegistering(false); }}
-                                    className="flex items-center gap-1.5 text-xs text-neutral-500 hover:text-neutral-900 transition-colors mb-4"
-                                >
-                                    <ArrowLeft size={14} />
-                                    Back
-                                </button>
-
-                                <form onSubmit={isRegistering ? handleRegister : handleLogin} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                                    {isRegistering && (
-                                        <AuthField label="Full Name" type="text" placeholder="Enter your full name" value={fullName} onChange={setFullName} />
-                                    )}
-                                    <AuthField label="Email address" type="email" placeholder="name@company.com" value={email} onChange={setEmail} />
-                                    <AuthField label="Password" type="password" placeholder="Enter password" value={password} onChange={setPassword} />
-
-                                    <button
-                                        type="submit"
-                                        className="auth-submit-btn"
-                                        disabled={authLoading === "email"}
-                                        style={{
-                                            width: "100%",
-                                            background: "#111111",
-                                            color: "#ffffff",
-                                            border: "1px solid rgba(255,255,255,0.12)",
-                                            borderRadius: "9999px",
-                                            padding: "14px",
-                                            fontSize: "0.875rem",
-                                            fontWeight: 500,
-                                            cursor: authLoading === "email" ? "not-allowed" : "pointer",
-                                            opacity: authLoading === "email" ? 0.7 : 1,
-                                            marginTop: "4px",
-                                            transition: "background 0.15s, transform 0.12s, box-shadow 0.15s",
-                                            boxShadow: "0 4px 14px rgba(0,0,0,0.5)",
-                                            display: "flex",
-                                            alignItems: "center",
-                                            justifyContent: "center",
-                                            gap: "8px"
-                                        }}
-                                        onMouseEnter={e => {
-                                            if (authLoading !== "email") {
-                                                e.currentTarget.style.background = "#000"
-                                                e.currentTarget.style.transform = "translateY(-1px)"
-                                                e.currentTarget.style.boxShadow = "0 6px 20px rgba(0,0,0,0.6)"
-                                            }
-                                        }}
-                                        onMouseLeave={e => {
-                                            if (authLoading !== "email") {
-                                                e.currentTarget.style.background = "#111111"
-                                                e.currentTarget.style.transform = ""
-                                                e.currentTarget.style.boxShadow = "0 4px 14px rgba(0,0,0,0.5)"
-                                            }
-                                        }}
-                                    >
-                                        {authLoading === "email" && <Loader2 size={16} className="animate-spin" />}
-                                        {authLoading === "email" ? "Processing..." : (isRegistering ? "Create account" : "Continue")}
-                                    </button>
-                                </form>
-                            </div>
-                        )}
-
-
-                    </div>
-
-                    {message && (
-                        <div style={{
-                            marginTop: "14px",
-                            padding: "12px 16px",
-                            borderRadius: "10px",
-                            fontSize: "0.8125rem",
-                            textAlign: "center",
-                            fontWeight: 500,
-                            background: message.includes("success") || message.includes("Welcome") || message.includes("sent")
-                                ? "rgba(34,197,94,0.18)" : "rgba(239,68,68,0.18)",
-                            border: `1px solid ${message.includes("success") || message.includes("Welcome") || message.includes("sent") ? "rgba(34,197,94,0.35)" : "rgba(239,68,68,0.35)"}`,
-                            color: message.includes("success") || message.includes("Welcome") || message.includes("sent") ? "#86efac" : "#fca5a5",
-                        }}>
-                            {message}
-                        </div>
-                    )}
-
-                    {loginStage === 'initial' && (
-                        <div style={{ marginTop: "22px", textAlign: "center" }}>
-                            <span style={{ fontSize: "0.8125rem", color: "#111" }}>
-                                {isRegistering ? "Already have an account? " : "Don't have an account? "}
-                            </span>
-                            <button
-                                type="button"
-                                onClick={() => { setLoginStage('email'); setIsRegistering(true); setMessage(""); }}
-                                style={{
-                                    background: "none", border: "none",
-                                    color: "#111", fontSize: "0.8125rem",
-                                    fontWeight: 600, cursor: "pointer",
-                                    textDecoration: "underline", textUnderlineOffset: "3px", padding: 0,
-                                }}
-                            >
-                                Sign up
-                            </button>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* Public Footer */}
-            <div className="absolute bottom-6 left-0 right-0 flex items-center justify-center gap-4 text-[11px] font-medium text-neutral-500 z-50">
-                <button
-                    onClick={() => setShowFaq(true)}
-                    className="hover:text-neutral-700 transition-colors cursor-pointer px-3 py-1.5 rounded-full hover:bg-black/5"
-                >
-                    FAQ
-                </button>
-                <span>·</span>
-                <button
-                    onClick={() => {
-                        window.dispatchEvent(new CustomEvent('open-cookie-settings'))
-                    }}
-                    className="hover:text-neutral-700 transition-colors cursor-pointer px-3 py-1.5 rounded-full hover:bg-black/5"
-                >
-                    Cookie Settings
-                </button>
-            </div>
-
-            {/* Public FAQ Modal */}
-            {showFaq && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[85vh]">
-                        <div className="flex items-center justify-between border-b border-neutral-100 p-4">
-                            <h2 className="text-lg font-semibold text-neutral-900">Frequently Asked Questions</h2>
-                            <button
-                                onClick={() => setShowFaq(false)}
-                                className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 transition-colors"
-                            >
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-                            </button>
-                        </div>
-                        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                            <div>
-                                <h3 className="text-sm font-semibold text-neutral-900 mb-1">How does the AI Agent work?</h3>
-                                <p className="text-sm text-neutral-600">The agent breaks down complex tasks into sub-tasks, researches across attached policies and regulations, and synthesizes a comprehensive finding.</p>
-                            </div>
-                            <div>
-                                <h3 className="text-sm font-semibold text-neutral-900 mb-1">Is my data secure?</h3>
-                                <p className="text-sm text-neutral-600">Yes. All uploaded documents are strictly scoped to your tenant and workspace. OpusLex does not train public models on your private data.</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </div>
-    )
-}
-
-export default Auth

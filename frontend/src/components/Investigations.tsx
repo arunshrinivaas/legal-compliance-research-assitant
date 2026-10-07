@@ -67,6 +67,9 @@ type Investigation = {
     description: string | null
     status: string
     user_id: number
+    review_status: string | null
+    reviewer_id: number | null
+    reviewed_at: string | null
 }
 
 type InvestigationQuery = {
@@ -74,6 +77,14 @@ type InvestigationQuery = {
     investigation_id: number
     question: string
     answer: string | null
+    created_at: string
+}
+
+type CommentData = {
+    id: number
+    investigation_id: number
+    user_id: number
+    text: string
     created_at: string
 }
 
@@ -97,6 +108,8 @@ type AgentRunResponse = {
     applicable_requirements: AgentRequirement[]
     suggested_actions: AgentAction[]
     citations: AgentCitation[]
+    risk_score: number | null
+    risk_level: string | null
     created_at: string
 }
 
@@ -144,6 +157,13 @@ function Investigations() {
     const [shareSource, setShareSource] = useState("")
     const [sharingKnowledge, setSharingKnowledge] = useState(false)
     // ---------------------------------------------------------
+    // Comments state
+    // ---------------------------------------------------------
+    const [comments, setComments] = useState<CommentData[]>([])
+    const [loadingComments, setLoadingComments] = useState(false)
+    const [newCommentText, setNewCommentText] = useState("")
+    const [submittingComment, setSubmittingComment] = useState(false)
+    // ---------------------------------------------------------
     // Agent state
     // ---------------------------------------------------------
     const [agentQuestion, setAgentQuestion] = useState("")
@@ -168,23 +188,70 @@ function Investigations() {
     const [editInvestigationDescription, setEditInvestigationDescription] = useState("")
     const [editingInvestigation, setEditingInvestigation] = useState(false)
 
+    // Review Modal State
+    const [reviewModalOpen, setReviewModalOpen] = useState(false)
+    const [reviewDecision, setReviewDecision] = useState<"Approved" | "Rejected" | null>(null)
+    const [reviewReason, setReviewReason] = useState("")
+    const [submittingReview, setSubmittingReview] = useState(false)
+    const [reviewError, setReviewError] = useState("")
+
     const [archivingInvestigation, setArchivingInvestigation] = useState(false)
 
     const [deleteInvestigationId, setDeleteInvestigationId] = useState<number | null>(null)
     const [deletingInvestigation, setDeletingInvestigation] = useState(false)
-    
+
     const [showArchives, setShowArchives] = useState(false)
-    
+
     const [activeMenuId, setActiveMenuId] = useState<number | null>(null)
 
 
-    
+
+    const submitComment = async () => {
+        if (!newCommentText.trim() || !selectedInvestigation || submittingComment) return
+
+        const token = localStorage.getItem("access_token")
+
+        if (!token) {
+            return
+        }
+
+        setSubmittingComment(true)
+
+        try {
+            const response = await fetch(
+                `http://127.0.0.1:8000/api/v1/investigations/${selectedInvestigation.id}/comments`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({
+                        text: newCommentText.trim()
+                    }),
+                }
+            )
+
+            if (!response.ok) {
+                return
+            }
+
+            const newComment = await response.json()
+            setComments((prev) => [...prev, newComment])
+            setNewCommentText("")
+        } catch {
+            // Error handled implicitly
+        } finally {
+            setSubmittingComment(false)
+        }
+    }
+
     const runAgent = async () => {
         if (!agentQuestion.trim() || !selectedInvestigation) return
 
         setAgentLoading(true)
         setAgentError("")
-        
+
         try {
             const token = localStorage.getItem("access_token")
             const response = await fetch(
@@ -415,7 +482,50 @@ function Investigations() {
             }
         }
 
+        const loadComments = async () => {
+            if (!selectedInvestigation) {
+                setComments([])
+                setLoadingComments(false)
+                return
+            }
+
+            const token = localStorage.getItem("access_token")
+
+            if (!token) {
+                setComments([])
+                setLoadingComments(false)
+                return
+            }
+
+            setLoadingComments(true)
+
+            try {
+                const response = await fetch(
+                    `http://127.0.0.1:8000/api/v1/investigations/${selectedInvestigation.id}/comments`,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                        },
+                    }
+                )
+
+                const data = await response.json()
+
+                if (!response.ok) {
+                    setComments([])
+                    return
+                }
+
+                setComments(data)
+            } catch {
+                setComments([])
+            } finally {
+                setLoadingComments(false)
+            }
+        }
+
         loadResearchHistory()
+        loadComments()
     }, [selectedInvestigation])
 
     const createInvestigation = async () => {
@@ -937,6 +1047,48 @@ function Investigations() {
         ).values()
     )
 
+    const handleReviewSubmit = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!selectedInvestigation || !reviewDecision) return
+
+        setSubmittingReview(true)
+        setReviewError("")
+        try {
+            const token = localStorage.getItem("token")
+            const response = await fetch(`/api/v1/investigations/${selectedInvestigation.id}/review`, {
+                method: "PATCH",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    review_status: reviewDecision,
+                    reason: reviewReason,
+                }),
+            })
+
+            if (!response.ok) {
+                const data = await response.json()
+                throw new Error(data.detail || "Failed to submit review")
+            }
+
+            const updatedInv = await response.json()
+
+            setInvestigations((prev) =>
+                prev.map((inv) =>
+                    inv.id === updatedInv.id ? updatedInv : inv
+                )
+            )
+            setSelectedInvestigation(updatedInv)
+
+            setReviewModalOpen(false)
+        } catch (error: any) {
+            setReviewError(error.message || "An unexpected error occurred.")
+        } finally {
+            setSubmittingReview(false)
+        }
+    }
+
     const runComparison = async () => {
         if (!selectedInvestigation) {
             setCompareError("Please select an investigation first.")
@@ -994,13 +1146,13 @@ function Investigations() {
                     console.log(`  appears filename ${d.filename}:`, data.comparison?.includes(d.filename))
                 })
             }
-            
+
             // Extract the labels actually present in the comparison text
-            const textLabels = data.comparison 
-                ? [...new Set([...data.comparison.matchAll(/Document ([A-Z])/g)].map(m => m[1]))] 
+            const textLabels = data.comparison
+                ? [...new Set([...data.comparison.matchAll(/Document ([A-Z])/g)].map(m => m[1]))]
                 : [];
             console.log("[DIAG:FRONTEND_RESPONSE] exact labels detected from the text:", textLabels);
-            
+
             const sections = data.comparison ? data.comparison.split("─────────────────────────────────────────────────────") : [];
             const docSection = sections[1] || "";
             const numSections = docSection ? [...docSection.matchAll(/Document [A-Z] —/g)].length : 0;
@@ -1331,7 +1483,7 @@ function Investigations() {
                                             <span>Archives ({archivedInvestigations.length})</span>
                                             <span>{showArchives ? "Hide" : "Show"}</span>
                                         </button>
-                                        
+
                                         {showArchives && (
                                             <div className="mt-3 space-y-2">
                                                 {archivedInvestigations.map((item) => (
@@ -1846,7 +1998,7 @@ function Investigations() {
                                         {researchHistory.map((item) => (
                                             <div key={item.id} className="rounded-lg border border-neutral-100 bg-neutral-50 overflow-hidden">
                                                 <button
-                                                    type="button" 
+                                                    type="button"
                                                     className="w-full p-3 text-left transition hover:bg-white cursor-pointer block"
                                                     onClick={() => setExpandedHistoryId(expandedHistoryId === item.id ? null : item.id)}
                                                 >
@@ -1864,13 +2016,13 @@ function Investigations() {
                                                         </p>
                                                     )}
                                                 </button>
-                                                
+
                                                 {expandedHistoryId === item.id && (
                                                     <div className="border-t border-neutral-100 bg-white p-3">
                                                         <div className="flex justify-between items-center mb-3">
                                                             <h4 className="text-xs font-semibold text-neutral-700">Research Result</h4>
                                                             <div className="flex items-center gap-2">
-                                                                <button 
+                                                                <button
                                                                     onClick={() => {
                                                                         setShareTitle(`Finding: ${item.question}`)
                                                                         setShareContent(item.answer || "")
@@ -1881,7 +2033,7 @@ function Investigations() {
                                                                 >
                                                                     <Upload size={10} /> Share Finding
                                                                 </button>
-                                                                <button 
+                                                                <button
                                                                     onClick={() => {
                                                                         setQuestion(item.question)
                                                                         setAnswer(item.answer || "")
@@ -2088,30 +2240,22 @@ function Investigations() {
                     />
 
                     <div className="divide-y divide-neutral-100">
-                        <Comment
-                            initials="PM"
-                            name="Priya M."
-                            role="Compliance"
-                            time="18 min ago"
-                            text="We should verify whether the retention schedule is documented for each category of employee data."
-                        />
-
-                        <Comment
-                            initials="AS"
-                            name="Arun S."
-                            role="Research"
-                            time="12 min ago"
-                            text="I found the current policy document in the evidence set. The relevant section is now available for review."
-                        />
-
-                        <Comment
-                            initials="AI"
-                            name="Research Assistant"
-                            role="AI"
-                            time="8 min ago"
-                            text="The available evidence suggests a review is required. I have linked the relevant document below."
-                            ai
-                        />
+                        {loadingComments ? (
+                            <div className="p-4 text-center text-xs text-neutral-400">Loading comments...</div>
+                        ) : comments.length === 0 ? (
+                            <div className="p-4 text-center text-xs text-neutral-400">No comments yet.</div>
+                        ) : (
+                            comments.map((comment) => (
+                                <Comment
+                                    key={comment.id}
+                                    initials={`U${comment.user_id}`}
+                                    name={`User ${comment.user_id}`}
+                                    role="Investigator"
+                                    time={new Date(comment.created_at).toLocaleString()}
+                                    text={comment.text}
+                                />
+                            ))
+                        )}
                     </div>
 
                     <div className="border-t border-neutral-100 p-3">
@@ -2119,9 +2263,21 @@ function Investigations() {
                             <input
                                 className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-neutral-400"
                                 placeholder="Add a comment to this investigation..."
+                                value={newCommentText}
+                                onChange={(e) => setNewCommentText(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        submitComment()
+                                    }
+                                }}
+                                disabled={submittingComment}
                             />
 
-                            <button className="flex h-7 w-7 items-center justify-center rounded-full bg-neutral-900 text-white">
+                            <button
+                                onClick={submitComment}
+                                disabled={submittingComment || !newCommentText.trim()}
+                                className="flex h-7 w-7 items-center justify-center rounded-full bg-neutral-900 text-white disabled:opacity-50"
+                            >
                                 <ChevronRight size={13} />
                             </button>
                         </div>
@@ -2240,12 +2396,12 @@ function Investigations() {
                                     <h3 className="text-xs font-semibold">Agent Run History</h3>
                                     <span className="text-xs text-neutral-400">{agentRuns.length} run{agentRuns.length !== 1 ? 's' : ''}</span>
                                 </div>
-                                
+
                                 <div className="flex flex-col gap-3">
                                     {agentRuns.map((run) => (
                                         <div key={run.id} className="rounded-xl border border-neutral-200 overflow-hidden bg-white">
                                             <button
-                                                type="button" 
+                                                type="button"
                                                 className="w-full text-left p-3 bg-neutral-50 border-b border-neutral-100 cursor-pointer hover:bg-neutral-100 transition block"
                                                 onClick={() => setExpandedAgentRunId(expandedAgentRunId === run.id ? null : run.id)}
                                             >
@@ -2393,23 +2549,18 @@ function Investigations() {
                         icon={<Sparkles size={13} />}
                     >
                         <div className="space-y-3">
-                            <AgentStatus
-                                name="Regulation Analyst"
-                                detail="Completed comparison"
-                                active={false}
-                            />
-
-                            <AgentStatus
-                                name="Evidence Analyst"
-                                detail="Reviewing evidence"
-                                active
-                            />
-
-                            <AgentStatus
-                                name="Risk Analyst"
-                                detail="Waiting for evidence"
-                                active={false}
-                            />
+                            {agentRuns.length === 0 ? (
+                                <p className="text-xs text-neutral-400">No agent activity yet.</p>
+                            ) : (
+                                agentRuns.slice(0, 3).map((run) => (
+                                    <AgentStatus
+                                        key={run.id}
+                                        name="Agent Run"
+                                        detail={run.status.charAt(0).toUpperCase() + run.status.slice(1)}
+                                        active={run.status === "processing" || run.status === "pending"}
+                                    />
+                                ))
+                            )}
                         </div>
                     </InsightPanel>
 
@@ -2419,19 +2570,42 @@ function Investigations() {
                     >
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-xs font-medium">
-                                    Review required
-                                </p>
-
-                                <p className="mt-1 text-xs leading-4 text-neutral-400">
-                                    A human decision is required before the
-                                    recommendation can be finalized.
-                                </p>
+                                {selectedInvestigation?.review_status ? (
+                                    <>
+                                        <p className={`text-xs font-medium ${selectedInvestigation.review_status === 'Approved' ? 'text-green-700' : 'text-red-700'}`}>
+                                            {selectedInvestigation.review_status}
+                                        </p>
+                                        <p className="mt-1 text-xs leading-4 text-neutral-400">
+                                            Reviewed on {new Date(selectedInvestigation.reviewed_at!).toLocaleDateString()}
+                                            {selectedInvestigation.reviewer_id && ` by User ${selectedInvestigation.reviewer_id}`}
+                                        </p>
+                                    </>
+                                ) : (
+                                    <>
+                                        <p className="text-xs font-medium">
+                                            Review required
+                                        </p>
+                                        <p className="mt-1 text-xs leading-4 text-neutral-400">
+                                            A human decision is required before the
+                                            recommendation can be finalized.
+                                        </p>
+                                    </>
+                                )}
                             </div>
 
-                            <button className="ml-3 shrink-0 rounded-md border border-neutral-200 px-2 py-1.5 text-xs text-neutral-500 hover:bg-neutral-50">
-                                Review
-                            </button>
+                            {!selectedInvestigation?.review_status && (
+                                <button
+                                    onClick={() => {
+                                        setReviewDecision(null)
+                                        setReviewReason("")
+                                        setReviewError("")
+                                        setReviewModalOpen(true)
+                                    }}
+                                    className="ml-3 shrink-0 rounded-md border border-neutral-200 px-2 py-1.5 text-xs text-neutral-500 hover:bg-neutral-50"
+                                >
+                                    Review
+                                </button>
+                            )}
                         </div>
                     </InsightPanel>
 
@@ -2439,90 +2613,249 @@ function Investigations() {
                         title="Risk Evaluation"
                         icon={<ShieldAlert size={13} />}
                     >
-                        <div className="flex items-end justify-between">
-                            <div>
-                                <p className="text-2xl font-semibold tracking-tight">
-                                    Medium
-                                </p>
+                        {(() => {
+                            const latestRun = agentRuns.find(run => run.status === 'completed' && run.risk_score !== null && run.risk_score !== undefined)
 
-                                <p className="mt-1 text-xs text-neutral-400">
-                                    Preliminary assessment
-                                </p>
-                            </div>
+                            if (latestRun) {
+                                return (
+                                    <>
+                                        <div className="flex items-end justify-between">
+                                            <div>
+                                                <p className="text-2xl font-semibold tracking-tight">
+                                                    {latestRun.risk_level}
+                                                </p>
 
-                            <span className="text-xs text-neutral-400">
-                                62 / 100
-                            </span>
-                        </div>
+                                                <p className="mt-1 text-xs text-neutral-400">
+                                                    Automated preliminary heuristic based on structured findings
+                                                </p>
+                                            </div>
 
-                        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-neutral-100">
-                            <div className="h-full w-[62%] rounded-full bg-neutral-700" />
-                        </div>
+                                            <span className="text-xs text-neutral-400">
+                                                {latestRun.risk_score} / 100
+                                            </span>
+                                        </div>
+
+                                        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-neutral-100">
+                                            <div className="h-full rounded-full bg-neutral-700" style={{ width: `${latestRun.risk_score}%` }} />
+                                        </div>
+                                    </>
+                                )
+                            }
+
+                            return (
+                                <>
+                                    <div className="flex items-end justify-between">
+                                        <div>
+                                            <p className="text-2xl font-semibold tracking-tight">
+                                                Pending
+                                            </p>
+
+                                            <p className="mt-1 text-xs text-neutral-400">
+                                                Automated preliminary heuristic based on structured findings
+                                            </p>
+                                        </div>
+
+                                        <span className="text-xs text-neutral-400">
+                                            N/A
+                                        </span>
+                                    </div>
+
+                                    <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-neutral-100">
+                                        <div className="h-full w-0 rounded-full bg-neutral-700" />
+                                    </div>
+                                </>
+                            )
+                        })()}
                     </InsightPanel>
 
                     <InsightPanel
                         title="Governance Recommendation"
                         icon={<CheckCircle2 size={13} />}
                     >
-                        <p className="text-xs font-medium leading-5">
-                            Review and formalize retention periods for
-                            employee data categories.
-                        </p>
-
-                        <p className="mt-2 text-xs leading-4 text-neutral-400">
-                            Recommendation remains subject to human review and
-                            supporting evidence validation.
-                        </p>
+                        {(() => {
+                            const latestRun = agentRuns.find(run => run.status === 'completed' && run.suggested_actions && run.suggested_actions.length > 0)
+                            if (latestRun) {
+                                const action = latestRun.suggested_actions[0]
+                                return (
+                                    <>
+                                        <p className="text-xs font-medium leading-5">
+                                            {action.action}
+                                        </p>
+                                        <p className="mt-2 text-xs leading-4 text-neutral-400">
+                                            {action.reason}
+                                        </p>
+                                    </>
+                                )
+                            }
+                            return (
+                                <p className="text-xs leading-4 text-neutral-400">
+                                    No recommendations yet.
+                                </p>
+                            )
+                        })()}
                     </InsightPanel>
 
                     <InsightPanel
                         title="Recommendation Trace"
                         icon={<Search size={13} />}
                     >
-                        <div className="space-y-2">
-                            <TraceRow
-                                number="01"
-                                text="Regulatory requirement identified"
-                            />
+                        {(() => {
+                            const latestRun = agentRuns.find(run => run.status === 'completed')
 
-                            <TraceRow
-                                number="02"
-                                text="Internal policy evidence retrieved"
-                            />
+                            if (!latestRun) {
+                                return (
+                                    <p className="text-xs leading-4 text-neutral-400">
+                                        Awaiting analysis to generate trace.
+                                    </p>
+                                )
+                            }
 
-                            <TraceRow
-                                number="03"
-                                text="Potential gap identified"
-                            />
+                            const traceSteps: string[] = ["Analysis initialized"]
 
-                            <TraceRow
-                                number="04"
-                                text="Risk evaluation initiated"
-                            />
-                        </div>
+                            if (latestRun.applicable_requirements && latestRun.applicable_requirements.length > 0) {
+                                traceSteps.push("Regulatory requirements identified")
+                            }
+                            if (latestRun.evidence && latestRun.evidence.length > 0) {
+                                traceSteps.push("Document evidence retrieved")
+                            }
+                            if (latestRun.conflicts && latestRun.conflicts.length > 0) {
+                                traceSteps.push("Policy conflicts detected")
+                            }
+                            if (latestRun.evidence_gaps && latestRun.evidence_gaps.length > 0) {
+                                traceSteps.push("Evidence gaps identified")
+                            }
+                            if (latestRun.risk_score !== null && latestRun.risk_score !== undefined) {
+                                traceSteps.push("Risk evaluation completed")
+                            }
+                            if (latestRun.suggested_actions && latestRun.suggested_actions.length > 0) {
+                                traceSteps.push("Governance recommendations generated")
+                            }
+
+                            return (
+                                <div className="space-y-2">
+                                    {traceSteps.map((step, index) => (
+                                        <TraceRow
+                                            key={index}
+                                            number={String(index + 1).padStart(2, '0')}
+                                            text={step}
+                                        />
+                                    ))}
+                                </div>
+                            )
+                        })()}
                     </InsightPanel>
 
                     <InsightPanel
                         title="Collaboration"
                         icon={<Users size={13} />}
                     >
-                        <div className="flex items-center gap-2">
-                            <Avatar initials="PM" />
-                            <Avatar initials="AS" />
-                            <Avatar initials="RK" />
-
-                            <span className="ml-1 text-xs text-neutral-400">
-                                3 people active
-                            </span>
-                        </div>
-
-                        <p className="mt-3 text-xs leading-4 text-neutral-400">
-                            Changes, comments and agent activity are shared
-                            with investigation participants.
-                        </p>
+                        {(() => {
+                            const uniqueUserIds = Array.from(new Set(comments.map(c => c.user_id)))
+                            if (uniqueUserIds.length > 0) {
+                                return (
+                                    <>
+                                        <div className="flex items-center gap-2">
+                                            {uniqueUserIds.slice(0, 3).map(uid => (
+                                                <Avatar key={uid} initials={`U${uid}`} />
+                                            ))}
+                                            <span className="ml-1 text-xs text-neutral-400">
+                                                {uniqueUserIds.length} participant{uniqueUserIds.length !== 1 ? 's' : ''}
+                                            </span>
+                                        </div>
+                                        <p className="mt-3 text-xs leading-4 text-neutral-400">
+                                            Changes, comments and agent activity are shared with investigation participants.
+                                        </p>
+                                    </>
+                                )
+                            }
+                            return (
+                                <p className="text-xs leading-4 text-neutral-400">
+                                    No participants yet.
+                                </p>
+                            )
+                        })()}
                     </InsightPanel>
                 </div>
             </aside>
+
+            {/* Review Modal */}
+            {reviewModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+                    <div className="w-full max-w-md overflow-hidden rounded-xl bg-white shadow-2xl ring-1 ring-neutral-200/50">
+                        <div className="border-b border-neutral-100 bg-neutral-50/50 px-5 py-4">
+                            <h3 className="text-base font-semibold text-neutral-900">
+                                Human Review
+                            </h3>
+                            <p className="mt-1 text-sm text-neutral-500">
+                                Provide a final compliance decision for this investigation.
+                            </p>
+                        </div>
+                        <form onSubmit={handleReviewSubmit} className="p-5">
+                            <div className="space-y-4">
+                                <div className="flex gap-4">
+                                    <label className="flex items-center gap-2 text-sm text-neutral-700">
+                                        <input
+                                            type="radio"
+                                            name="reviewDecision"
+                                            value="Approved"
+                                            checked={reviewDecision === "Approved"}
+                                            onChange={() => setReviewDecision("Approved")}
+                                            className="h-4 w-4 border-neutral-300 text-blue-600 focus:ring-blue-600"
+                                        />
+                                        Approve
+                                    </label>
+                                    <label className="flex items-center gap-2 text-sm text-neutral-700">
+                                        <input
+                                            type="radio"
+                                            name="reviewDecision"
+                                            value="Rejected"
+                                            checked={reviewDecision === "Rejected"}
+                                            onChange={() => setReviewDecision("Rejected")}
+                                            className="h-4 w-4 border-neutral-300 text-blue-600 focus:ring-blue-600"
+                                        />
+                                        Reject
+                                    </label>
+                                </div>
+                                <div>
+                                    <label className="mb-1 block text-sm font-medium text-neutral-700">
+                                        Justification (optional)
+                                    </label>
+                                    <textarea
+                                        value={reviewReason}
+                                        onChange={(e) => setReviewReason(e.target.value)}
+                                        className="h-24 w-full rounded-md border border-neutral-200 p-3 text-sm focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                                        placeholder="Explain the reasoning behind this decision..."
+                                    />
+                                </div>
+                            </div>
+
+                            {reviewError && (
+                                <div className="mt-3 rounded bg-red-50 p-2 text-xs text-red-600">
+                                    {reviewError}
+                                </div>
+                            )}
+
+                            <div className="mt-6 flex justify-end gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setReviewModalOpen(false)}
+                                    className="rounded-md px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-100"
+                                    disabled={submittingReview}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={submittingReview || !reviewDecision}
+                                    className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+                                >
+                                    {submittingReview ? "Submitting..." : "Submit Review"}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
 
 
             {previewDocument && (
@@ -2627,7 +2960,7 @@ function Investigations() {
                             <h2 className="text-lg font-semibold text-neutral-900">Share to Public Knowledge</h2>
                             <p className="mt-1 text-xs text-neutral-500">Publish this finding for all users in the organization to see.</p>
                         </div>
-                        
+
                         <div className="space-y-4">
                             <div>
                                 <label className="mb-1 block text-xs font-medium text-neutral-700">Title <span className="text-red-500">*</span></label>
@@ -2639,7 +2972,7 @@ function Investigations() {
                                     placeholder="Enter a descriptive title"
                                 />
                             </div>
-                            
+
                             <div>
                                 <label className="mb-1 block text-xs font-medium text-neutral-700">Content <span className="text-red-500">*</span></label>
                                 <textarea

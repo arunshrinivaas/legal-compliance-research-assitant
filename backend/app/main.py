@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 
 import app.models
 
@@ -18,12 +19,19 @@ from app.routers import (
     knowledge,
     workspace,
     help,
+    integrations,
+    mcp,
 )
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    async with mcp.mcp_server.session_manager.run():
+        yield
 
 app = FastAPI(
     title="Legal Compliance Research Assistant",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 
@@ -32,8 +40,10 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "http://localhost:5173",
+        "http://localhost:5174",
         "http://127.0.0.1:3000",
         "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -55,6 +65,9 @@ app.include_router(workspace.router)
 app.include_router(audit.router)
 app.include_router(governance.router)
 app.include_router(help.router)
+app.include_router(integrations.router)
+
+app.mount("/api/v1/mcp", mcp.AuthBridgeMiddleware(mcp.mcp_app))
 
 
 @app.get("/")

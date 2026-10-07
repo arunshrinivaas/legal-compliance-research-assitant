@@ -1,0 +1,154 @@
+{
+  "nav": {
+    "home": "Home",
+    "regulations": "Regulations",
+    "compliance": "Compliance",
+    "policies": "Policies",
+    "research": "Research",
+    "agents": "AI Agents",
+    "investigations": "Investigations",
+    "integrations": "Integrations",
+    "audit": "Audit & Findings",
+    "reports": "Reports",
+    "governance": "Governance",
+    "settings": "Settings",
+    "help": "Help"
+  },
+  "settings": {
+    "title": "Settings",
+    "categories": {
+      "app": "APP",
+      "account": "ACCOUNT",
+      "data_privacy": "DATA & PRIVACY",
+      "integrations": "INTEGRATIONS",
+      "advanced": "ADVANCED"
+    },
+    "tabs": {
+      "appearance": "Appearance",
+      "general": "General",
+      "accessibility": "Accessibility",
+      "notifications": "Notifications",
+      "profile": "Profile",
+      "security": "Security & Login",
+      "data": "Data Controls",
+      "storage": "Storage",
+      "language": "Language",
+      "privacy": "Privacy",
+      "integrations": "Integrations",
+      "advanced": "Advanced",
+      "workspace": "Workspace",
+      "navigation": "Navigation"
+    },
+    "appearance": {
+      "headerTitle": "Appearance",
+      "headerSub": "Customize how OpusLex looks on your device.",
+      "fontSize": {
+        "title": "Font size",
+        "description": "Choose how large application text should appear. The scale maintains typographic hierarchy throughout the application.",
+        "current": "Current:"
+      },
+      "density": {
+        "title": "Density",
+        "description": "Control how much space interface elements use."
+      },
+      "theme": {
+        "title": "Theme",
+        "description": "Select your preferred color theme.",
+        "comingSoon": "Coming soon"
+      }
+    },
+    "general": {
+      "headerTitle": "General",
+      "headerSub": "Configure general application behavior.",
+      "landing": {
+        "title": "Default landing section",
+        "description": "Choose the section that opens immediately after you log in.",
+        "takesEffect": "Takes effect on your next login."
+      }
+    },
+    "accessibility": {
+      "headerTitle": "Accessibility",
+      "headerSub": "Adjust the interface to suit your needs.",
+      "reduceMotion": {
+        "label": "Reduce motion",
+        "description": "Minimizes animations and transitions across the entire application, including the login background."
+      },
+      "largerTargets": {
+        "label": "Larger click targets",
+        "description": "Increases the padding on interactive controls for easier interaction."
+      },
+      "highContrast": {
+        "label": "High contrast",
+        "description": "Increases text and border contrast across the application."
+      },
+      "osPreference": "Reduce motion also respects your operating system's motion preference."
+    },
+    "language": {
+      "headerTitle": "Language",
+      "headerSub": "Manage the display language for this application.",
+      "english": "English",
+      "spanish": "Spanish",
+      "active": "Active",
+      "select": "Select language"
+    },
+    "workspace": {
+      "headerTitle": "Workspace",
+      "headerSub": "Information about your active OpusLex environment.",
+      "activeEnv": {
+        "title": "Active Environment",
+        "description": "You are operating in your unified OpusLex workspace.",
+        "defaultLanding": "Default landing section can be configured in",
+        "generalLink": "General"
+      },
+      "identity": {
+        "title": "Workspace Identity",
+        "description": "Manage how your workspace is identified.",
+        "nameLabel": "Workspace Name",
+        "save": "Save",
+        "saving": "Saving...",
+        "saved": "Saved",
+        "emptyError": "Workspace name cannot be empty."
+      },
+      "usage": {
+        "title": "Usage Overview",
+        "description": "Current metrics for your workspace.",
+        "documents": "Total Documents",
+        "investigations": "Active Investigations",
+        "agentRuns": "Total Agent Runs",
+        "loading": "Loading metrics...",
+        "error": "Failed to load metrics."
+      }
+    },
+    "storage": {
+      "headerTitle": "Storage",
+      "headerSub": "Workspace storage information.",
+      "summary": {
+        "title": "Storage Summary",
+        "totalDocuments": "Total Documents"
+      },
+      "documents": {
+        "title": "Uploaded Documents",
+        "empty": "No documents uploaded yet. Research documents will appear here.",
+        "deleteAction": "Delete",
+        "confirmDelete": "Are you sure you want to delete this document?",
+        "deletedSuccess": "Document deleted successfully."
+      }
+    },
+    "security": {
+      "status": {
+        "configured": "Configured",
+        "notConfigured": "Not configured",
+        "linked": "Linked",
+        "notLinked": "Not linked",
+        "verified": "Verified",
+        "notVerified": "Not verified"
+      },
+      "action": {
+        "changePassword": "Change password",
+        "setPassword": "Set password",
+        "link_phone": "Link phone number",
+        "verify_email": "Verify email"
+      }
+    }
+  }
+}

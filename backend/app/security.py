@@ -27,6 +27,8 @@ def create_access_token(
     expires_delta: timedelta | None = None,
 ) -> str:
     to_encode = data.copy()
+    if "type" not in to_encode:
+        to_encode["type"] = "access"
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:
@@ -34,6 +36,23 @@ def create_access_token(
             minutes=settings.jwt_access_token_expire_minutes
         )
     to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+
+
+def create_mfa_challenge_token(
+    user_id: int,
+    email: str,
+    expires_delta: timedelta | None = None,
+) -> str:
+    expire = datetime.now(timezone.utc) + (
+        expires_delta if expires_delta else timedelta(minutes=5)
+    )
+    to_encode = {
+        "sub": str(user_id),
+        "email": email,
+        "type": "mfa_challenge",
+        "exp": expire,
+    }
     return jwt.encode(to_encode, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 

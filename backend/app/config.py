@@ -53,6 +53,25 @@ class Settings:
     # Upload
     upload_dir: str = os.getenv("UPLOAD_DIR", "uploads")
 
+    # Google OAuth
+    google_client_id: str = os.getenv("GOOGLE_CLIENT_ID", "")
+    google_client_secret: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
+    oauth_encryption_key: str = os.getenv("OAUTH_ENCRYPTION_KEY", "")
+
+    # Apple OAuth
+    apple_client_id: str = os.getenv("APPLE_CLIENT_ID", "")
+
+    # Twilio Verify
+    twilio_account_sid: str = os.getenv("TWILIO_ACCOUNT_SID", "")
+    twilio_auth_token: str = os.getenv("TWILIO_AUTH_TOKEN", "")
+    twilio_verify_service_sid: str = os.getenv("TWILIO_VERIFY_SERVICE_SID", "")
+
+    # SMTP / Email
+    smtp_host: str = os.getenv("SMTP_HOST", "")
+    smtp_port: int = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user: str = os.getenv("SMTP_USER", "")
+    smtp_password: str = os.getenv("SMTP_PASSWORD", "")
+    smtp_from_email: str = os.getenv("SMTP_FROM_EMAIL", "no-reply@opuslex.com")
 
 _settings = None
 

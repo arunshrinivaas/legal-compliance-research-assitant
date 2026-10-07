@@ -162,3 +162,36 @@ scratch/
 
 # Local Python environment
 .venv/
+
+# Local development database
+backend/opuslex.db
+
+# Local diagnostic scripts
+backend/check_db.py
+backend/run_diag.py
+backend/test_auth.py
+backend/test_auth_bridge.py
+backend/test_callback.py
+backend/test_callback_format.py
+backend/test_comments_script.py
+backend/test_dotenv.py
+backend/test_google_endpoint.py
+backend/test_httpx.py
+backend/test_mcp.py
+backend/test_mcp_client.py
+backend/test_mcp_ctx.py
+backend/test_mcp_tool.py
+backend/test_running.py
+backend/test_script.py
+backend/test_server.py
+backend/test_server_auth.py
+backend/test_status.py
+backend/test_transport.py
+
+# Local frontend diagnostic scripts
+frontend/test_frontend.cjs
+frontend/test_gsi.cjs
+frontend/test_gsi.js
+frontend/test_playback.cjs
+frontend/test_prompt.cjs
+frontend/test_video.js

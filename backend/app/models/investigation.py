@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, Integer, String, Text
+import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -40,6 +41,22 @@ class Investigation(Base):
         Integer,
         nullable=False,
         index=True,
+    )
+
+    review_status: Mapped[str | None] = mapped_column(
+        String(50),
+        nullable=True,
+    )
+
+    reviewer_id: Mapped[int | None] = mapped_column(
+        Integer,
+        sa.ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    reviewed_at: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        nullable=True,
     )
 
     created_at: Mapped[datetime] = mapped_column(

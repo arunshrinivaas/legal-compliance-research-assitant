@@ -176,6 +176,22 @@ Document context:
         agent_run.suggested_actions = [a.model_dump() for a in finding_obj.suggested_actions]
         agent_run.citations = [c.model_dump() for c in finding_obj.citations]
 
+        # Calculate deterministic OpusLex heuristic risk score based on structured findings
+        num_conflicts = len(finding_obj.conflicts)
+        num_gaps = len(finding_obj.evidence_gaps)
+        num_actions = len(finding_obj.suggested_actions)
+
+        calculated_score = 100 - (20 * num_conflicts) - (10 * num_gaps) - (5 * num_actions)
+        risk_score = max(0, calculated_score)
+
+        agent_run.risk_score = risk_score
+        if risk_score >= 80:
+            agent_run.risk_level = "Low"
+        elif risk_score >= 50:
+            agent_run.risk_level = "Medium"
+        else:
+            agent_run.risk_level = "High"
+
     except (json.JSONDecodeError, ValidationError) as e:
         db.rollback()
         logger.error(f"Agent structured output validation failed: {e}")

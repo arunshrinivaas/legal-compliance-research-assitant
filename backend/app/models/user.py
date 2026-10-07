@@ -14,13 +14,35 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
-    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    email: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
+    # Nullable: Google-only accounts have no local password.
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     full_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     role: Mapped[str] = mapped_column(
         String(50), nullable=False, default="viewer"
     )
     is_active: Mapped[bool] = mapped_column(nullable=False, default=True)
+    mfa_enabled: Mapped[bool] = mapped_column(
+        nullable=False, default=False, server_default="false"
+    )
+    totp_secret: Mapped[str | None] = mapped_column(
+        String(255), nullable=True, default=None
+    )
+    # Google OAuth fields
+    google_id: Mapped[str | None] = mapped_column(
+        String(255), unique=True, nullable=True, default=None
+    )
+    # Apple OAuth fields
+    apple_id: Mapped[str | None] = mapped_column(
+        String(255), unique=True, nullable=True, default=None
+    )
+    # Phone OTP fields
+    phone_number: Mapped[str | None] = mapped_column(
+        String(20), unique=True, nullable=True, default=None
+    )
+    email_verified: Mapped[bool] = mapped_column(
+        nullable=False, default=False, server_default="false"
+    )
     created_at: Mapped[datetime | None] = mapped_column(
         nullable=True,
         server_default="CURRENT_TIMESTAMP",

@@ -115,6 +115,9 @@ class AgentRunResponse(BaseModel):
     suggested_actions: list[AgentAction] = []
     citations: list[AgentCitation] = []
 
+    risk_score: int | None = None
+    risk_level: str | None = None
+
     created_at: datetime
 
     model_config = {"from_attributes": True}

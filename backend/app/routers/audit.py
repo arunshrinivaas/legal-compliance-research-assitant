@@ -153,7 +153,7 @@ def get_audit_timeline(
     investigation_id: int | None = Query(None, description="Scope to a specific investigation"),
     event_type: str | None = Query(
         None,
-        description="Filter: agent_finding | rag_query | knowledge_shared",
+        description="Filter: agent_finding | rag_query | knowledge_shared | human_review",
     ),
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
@@ -256,6 +256,31 @@ def get_audit_timeline(
                     detail=kp.title,
                     status=None,
                     timestamp=kp.created_at,
+                )
+            )
+
+    # --------------------------------------------------------
+    # 4. Human Review (Investigation)
+    # --------------------------------------------------------
+    if event_type is None or event_type == "human_review":
+        inv_stmt = select(Investigation).where(
+            Investigation.user_id == current_user.id,
+            Investigation.reviewed_at.isnot(None)
+        )
+        if investigation_id is not None:
+            inv_stmt = inv_stmt.where(Investigation.id == investigation_id)
+
+        for inv in db.scalars(inv_stmt).all():
+            events.append(
+                TimelineEvent(
+                    id=f"review-{inv.id}",
+                    event_type="human_review",
+                    investigation_id=inv.id,
+                    investigation_title=inv_title_map.get(inv.id),
+                    title="Human Review",
+                    detail=f"Investigation {inv.review_status.lower() if inv.review_status else 'reviewed'} by reviewer",
+                    status=inv.review_status,
+                    timestamp=inv.reviewed_at,
                 )
             )
 

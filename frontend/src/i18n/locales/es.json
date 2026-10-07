@@ -1,0 +1,154 @@
+{
+  "nav": {
+    "home": "Inicio",
+    "regulations": "Regulaciones",
+    "compliance": "Cumplimiento",
+    "policies": "Políticas",
+    "research": "Investigación",
+    "agents": "Agentes IA",
+    "investigations": "Investigaciones",
+    "integrations": "Integraciones",
+    "audit": "Auditoría y Hallazgos",
+    "reports": "Reportes",
+    "governance": "Gobernanza",
+    "settings": "Configuración",
+    "help": "Ayuda"
+  },
+  "settings": {
+    "title": "Configuración",
+    "categories": {
+      "app": "APLICACIÓN",
+      "account": "CUENTA",
+      "data_privacy": "DATOS Y PRIVACIDAD",
+      "integrations": "INTEGRACIONES",
+      "advanced": "AVANZADO"
+    },
+    "tabs": {
+      "appearance": "Apariencia",
+      "general": "General",
+      "accessibility": "Accesibilidad",
+      "notifications": "Notificaciones",
+      "profile": "Perfil",
+      "security": "Seguridad e Inicio de sesión",
+      "data": "Controles de Datos",
+      "storage": "Almacenamiento",
+      "language": "Idioma",
+      "privacy": "Privacidad",
+      "integrations": "Integraciones",
+      "advanced": "Avanzado",
+      "workspace": "Espacio de trabajo",
+      "navigation": "Navegación"
+    },
+    "appearance": {
+      "headerTitle": "Apariencia",
+      "headerSub": "Personaliza cómo se ve OpusLex en tu dispositivo.",
+      "fontSize": {
+        "title": "Tamaño de fuente",
+        "description": "Elige qué tan grande debe aparecer el texto de la aplicación. La escala mantiene la jerarquía tipográfica en toda la aplicación.",
+        "current": "Actual:"
+      },
+      "density": {
+        "title": "Densidad",
+        "description": "Controla cuánto espacio usan los elementos de la interfaz."
+      },
+      "theme": {
+        "title": "Tema",
+        "description": "Selecciona tu tema de color preferido.",
+        "comingSoon": "Próximamente"
+      }
+    },
+    "general": {
+      "headerTitle": "General",
+      "headerSub": "Configura el comportamiento general de la aplicación.",
+      "landing": {
+        "title": "Sección de inicio predeterminada",
+        "description": "Elige la sección que se abre inmediatamente después de iniciar sesión.",
+        "takesEffect": "Tiene efecto en tu próximo inicio de sesión."
+      }
+    },
+    "accessibility": {
+      "headerTitle": "Accesibilidad",
+      "headerSub": "Ajusta la interfaz para adaptarla a tus necesidades.",
+      "reduceMotion": {
+        "label": "Reducir movimiento",
+        "description": "Minimiza las animaciones y transiciones en toda la aplicación, incluido el fondo de inicio de sesión."
+      },
+      "largerTargets": {
+        "label": "Objetivos de clic más grandes",
+        "description": "Aumenta el relleno en controles interactivos para facilitar la interacción."
+      },
+      "highContrast": {
+        "label": "Alto contraste",
+        "description": "Aumenta el contraste de texto y bordes en toda la aplicación."
+      },
+      "osPreference": "Reducir movimiento también respeta la preferencia de movimiento de tu sistema operativo."
+    },
+    "language": {
+      "headerTitle": "Idioma",
+      "headerSub": "Administra el idioma de visualización para esta aplicación.",
+      "english": "Inglés",
+      "spanish": "Español",
+      "active": "Activo",
+      "select": "Seleccionar idioma"
+    },
+    "workspace": {
+      "headerTitle": "Espacio de trabajo",
+      "headerSub": "Información sobre tu entorno activo de OpusLex.",
+      "activeEnv": {
+        "title": "Entorno Activo",
+        "description": "Estás operando en tu espacio de trabajo unificado de OpusLex.",
+        "defaultLanding": "La sección de inicio predeterminada se puede configurar en",
+        "generalLink": "General"
+      },
+      "identity": {
+        "title": "Identidad del Espacio de trabajo",
+        "description": "Administra cómo se identifica tu espacio de trabajo.",
+        "nameLabel": "Nombre del Espacio de trabajo",
+        "save": "Guardar",
+        "saving": "Guardando...",
+        "saved": "Guardado",
+        "emptyError": "El nombre del espacio de trabajo no puede estar vacío."
+      },
+      "usage": {
+        "title": "Resumen de Uso",
+        "description": "Métricas actuales para tu espacio de trabajo.",
+        "documents": "Total de Documentos",
+        "investigations": "Investigaciones Activas",
+        "agentRuns": "Ejecuciones de Agentes",
+        "loading": "Cargando métricas...",
+        "error": "Error al cargar las métricas."
+      }
+    },
+    "storage": {
+      "headerTitle": "Almacenamiento",
+      "headerSub": "Información de almacenamiento del espacio de trabajo.",
+      "summary": {
+        "title": "Resumen de almacenamiento",
+        "totalDocuments": "Total de documentos"
+      },
+      "documents": {
+        "title": "Documentos subidos",
+        "empty": "Aún no se han subido documentos. Los documentos de investigación aparecerán aquí.",
+        "deleteAction": "Eliminar",
+        "confirmDelete": "¿Estás seguro de que deseas eliminar este documento?",
+        "deletedSuccess": "Documento eliminado con éxito."
+      }
+    },
+    "security": {
+      "status": {
+        "configured": "Configurado",
+        "notConfigured": "No configurado",
+        "linked": "Vinculado",
+        "notLinked": "No vinculado",
+        "verified": "Verificado",
+        "notVerified": "No verificado"
+      },
+      "action": {
+        "changePassword": "Cambiar contraseña",
+        "setPassword": "Crear contraseña",
+        "link_phone": "Vincular número de teléfono",
+        "verify_email": "Verificar correo electrónico"
+      }
+    }
+  }
+}

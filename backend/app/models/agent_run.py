@@ -100,9 +100,18 @@ class AgentRun(Base):
         nullable=True,
     )
 
-    # list[AgentCitation]
     citations: Mapped[list | None] = mapped_column(
         JSON,
+        nullable=True,
+    )
+
+    risk_score: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+    )
+
+    risk_level: Mapped[str | None] = mapped_column(
+        String(50),
         nullable=True,
     )
 

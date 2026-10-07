@@ -479,6 +479,7 @@ def build_rag_context(
     query: str,
     limit: int = 5,
     document_ids: list[int] | None = None,
+    user_id: int | None = None,
 ) -> tuple[str, list[dict]]:
     if document_ids is not None:
         results = []
@@ -488,6 +489,7 @@ def build_rag_context(
                 query=query,
                 limit=limit,
                 document_ids=[doc_id],
+                user_id=user_id,
             )
             results.extend(doc_results)
         # Optional: Sort combined results by distance to prioritize most relevant overall
@@ -498,6 +500,7 @@ def build_rag_context(
             query=query,
             limit=limit,
             document_ids=document_ids,
+            user_id=user_id,
         )
 
     if not results:
@@ -542,12 +545,14 @@ async def answer_with_rag(
     question: str,
     limit: int = 5,
     document_ids: list[int] | None = None,
+    user_id: int | None = None,
 ) -> dict:
     context, sources = build_rag_context(
         db=db,
         query=question,
         limit=limit,
         document_ids=document_ids,
+        user_id=user_id,
     )
 
     answer = await ask_copilot_with_context(
