@@ -2,7 +2,7 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from datetime import timedelta
 
 from app.main import app

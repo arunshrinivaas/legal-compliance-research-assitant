@@ -1,3 +1,5 @@
+# Archived Python Reference Repo
+
 # OpusLex: Legal & Compliance Research Assistant
 
 OpusLex is a RAG-based AI Agent platform for legal and compliance professionals. It allows teams to investigate incidents, compare documents against compliance frameworks, and chat securely with an internal knowledge base.

@@ -1,9 +1,8 @@
 from datetime import datetime, timedelta
 import secrets
-import urllib.parse
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 import google_auth_oauthlib.flow
 from google.oauth2.credentials import Credentials
@@ -99,7 +98,7 @@ def google_drive_callback(
     
     try:
         flow.fetch_token(code=code)
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=400, detail="Failed to exchange authorization code")
         
     credentials = flow.credentials

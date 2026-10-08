@@ -1,9 +1,9 @@
 import pytest
-import asyncio
+
 from httpx import AsyncClient, ASGITransport
 from mcp.client.streamable_http import streamable_http_client
 from mcp.client.session import ClientSession
-from mcp.shared.exceptions import MCPError
+
 from asgi_lifespan import LifespanManager
 
 from app.main import app

@@ -64,7 +64,7 @@ def test_invalid_oauth_state():
 
 def test_callback_success(db_session):
     with patch("app.routers.integrations._get_google_flow") as mock_flow, \
-         patch("app.routers.integrations.encrypt_token", return_value="encrypted_refresh_token") as mock_encrypt, \
+         patch("app.routers.integrations.encrypt_token", return_value="encrypted_refresh_token") as _, \
          patch("google.oauth2.id_token.verify_oauth2_token", return_value={"email": "test@example.com"}):
         
         mock_flow_instance = MagicMock()

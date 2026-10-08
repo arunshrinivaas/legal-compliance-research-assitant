@@ -1,20 +1,20 @@
 import logging
-from fastapi import APIRouter, Request, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi import HTTPException
+
 from fastapi.security import HTTPAuthorizationCredentials
-from starlette.middleware.base import BaseHTTPMiddleware
+
 from starlette.types import Scope, Receive, Send
-from typing import Any
+
 import contextvars
 
 from mcp.server.mcpserver import MCPServer, Context
 from mcp.server.transport_security import TransportSecuritySettings
 
-from app.routers.auth import decode_access_token, get_current_user
+from app.routers.auth import get_current_user
 from app.database import SessionLocal
 from app.routers.policies import get_policies
 from app.routers.compliance import get_compliance
-from app.models.user import User
+
 from app.models.document import Document
 from app.services.rag_service import build_rag_context
 
