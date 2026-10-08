@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, patch
 import time
+import uuid
 
 from fastapi.testclient import TestClient
 
@@ -83,7 +84,8 @@ def test_send_email_otp_rate_limit_ip():
         assert resp_429.status_code == 429
 
 def test_verify_email_otp_new_user(db):
-    _email_otp_state["new@example.com"] = {
+    test_email = f"new_{uuid.uuid4().hex[:8]}@example.com"
+    _email_otp_state[test_email] = {
         "code": "123456",
         "expires_at": time.time() + 300,
         "attempts": 0
@@ -91,26 +93,27 @@ def test_verify_email_otp_new_user(db):
     
     response = client.post(
         "/api/v1/auth/email-otp/verify",
-        json={"email": "new@example.com", "code": "123456"}
+        json={"email": test_email, "code": "123456"}
     )
     assert response.status_code == 200
     data = response.json()
     assert "access_token" in data
     assert data["mfa_required"] is False
-    assert data["user"]["email"] == "new@example.com"
+    assert data["user"]["email"] == test_email
     
-    assert "new@example.com" not in _email_otp_state
+    assert test_email not in _email_otp_state
     
     # Check DB
-    user = db.query(User).filter(User.email == "new@example.com").first()
+    user = db.query(User).filter(User.email == test_email).first()
     assert user is not None
     assert user.email_verified is True
     assert user.password_hash is None
     assert user.role == "viewer"
 
 def test_verify_email_otp_existing_user(db):
+    test_email = f"existing_{uuid.uuid4().hex[:8]}@example.com"
     user = User(
-        email="existing_otp@example.com",
+        email=test_email,
         password_hash="fakehash",
         role="viewer",
         is_active=True,
@@ -119,7 +122,7 @@ def test_verify_email_otp_existing_user(db):
     db.add(user)
     db.commit()
     
-    _email_otp_state["existing_otp@example.com"] = {
+    _email_otp_state[test_email] = {
         "code": "654321",
         "expires_at": time.time() + 300,
         "attempts": 0
@@ -127,7 +130,7 @@ def test_verify_email_otp_existing_user(db):
     
     response = client.post(
         "/api/v1/auth/email-otp/verify",
-        json={"email": "existing_otp@example.com", "code": "654321"}
+        json={"email": test_email, "code": "654321"}
     )
     assert response.status_code == 200
     
@@ -180,8 +183,9 @@ def test_verify_email_otp_expired(db):
     assert "expired@example.com" not in _email_otp_state
 
 def test_verify_email_otp_with_mfa(db):
+    test_email = f"mfa_{uuid.uuid4().hex[:8]}@example.com"
     user = User(
-        email="mfa_otp@example.com",
+        email=test_email,
         password_hash="fakehash",
         role="viewer",
         is_active=True,
@@ -192,7 +196,7 @@ def test_verify_email_otp_with_mfa(db):
     db.add(user)
     db.commit()
     
-    _email_otp_state["mfa_otp@example.com"] = {
+    _email_otp_state[test_email] = {
         "code": "111111",
         "expires_at": time.time() + 300,
         "attempts": 0
@@ -200,7 +204,7 @@ def test_verify_email_otp_with_mfa(db):
     
     response = client.post(
         "/api/v1/auth/email-otp/verify",
-        json={"email": "mfa_otp@example.com", "code": "111111"}
+        json={"email": test_email, "code": "111111"}
     )
     assert response.status_code == 200
     data = response.json()
@@ -209,8 +213,9 @@ def test_verify_email_otp_with_mfa(db):
     assert "access_token" not in data
 
 def test_verify_email_otp_disabled_account(db):
+    test_email = f"disabled_{uuid.uuid4().hex[:8]}@example.com"
     user = User(
-        email="disabled_otp@example.com",
+        email=test_email,
         password_hash=None,
         role="viewer",
         is_active=False,
@@ -219,7 +224,7 @@ def test_verify_email_otp_disabled_account(db):
     db.add(user)
     db.commit()
     
-    _email_otp_state["disabled_otp@example.com"] = {
+    _email_otp_state[test_email] = {
         "code": "222222",
         "expires_at": time.time() + 300,
         "attempts": 0
@@ -227,6 +232,6 @@ def test_verify_email_otp_disabled_account(db):
     
     response = client.post(
         "/api/v1/auth/email-otp/verify",
-        json={"email": "disabled_otp@example.com", "code": "222222"}
+        json={"email": test_email, "code": "222222"}
     )
     assert response.status_code == 403
