@@ -287,6 +287,11 @@ function SettingsWorkspace({ user, onRefreshUser }: { user?: any; onRefreshUser?
     const [deleteError, setDeleteError] = useState<string | null>(null)
     const [deleteSuccess, setDeleteSuccess] = useState<string | null>(null)
 
+    // Data Export state
+    const [exportLoading, setExportLoading] = useState(false)
+    const [exportError, setExportError] = useState<string | null>(null)
+    const [exportSuccess, setExportSuccess] = useState<string | null>(null)
+
     useEffect(() => {
         if (phoneCooldown > 0) {
             const timer = setTimeout(() => setPhoneCooldown(c => c - 1), 1000)
@@ -516,6 +521,41 @@ function SettingsWorkspace({ user, onRefreshUser }: { user?: any; onRefreshUser?
             setDeleteError("Network error. Please try again.")
         } finally {
             setDeleteLoading(false)
+        }
+    }
+
+    const handleExportData = async () => {
+        setExportError(null)
+        setExportSuccess(null)
+        setExportLoading(true)
+
+        try {
+            const token = localStorage.getItem("access_token")
+            const res = await fetch("http://127.0.0.1:8000/api/v1/data/export", {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+
+            if (!res.ok) {
+                setExportError("Failed to export data. Please try again.")
+                return
+            }
+
+            const blob = await res.blob()
+            const url = window.URL.createObjectURL(blob)
+            const a = document.createElement("a")
+            a.href = url
+            a.download = `opuslex_export_${new Date().toISOString().split('T')[0]}.json`
+            document.body.appendChild(a)
+            a.click()
+            window.URL.revokeObjectURL(url)
+            document.body.removeChild(a)
+
+            setExportSuccess("Data exported successfully.")
+            setTimeout(() => setExportSuccess(null), 3000)
+        } catch {
+            setExportError("Network error. Please try again.")
+        } finally {
+            setExportLoading(false)
         }
     }
 
@@ -1507,9 +1547,18 @@ function SettingsWorkspace({ user, onRefreshUser }: { user?: any; onRefreshUser?
                                 {/* Data Export */}
                                 <div className="rounded-xl border border-neutral-200 bg-white p-4">
                                     <h4 className="text-body font-medium text-neutral-900 mb-1">Data Export</h4>
-                                    <p className="text-sm text-neutral-500">
-                                        Unified data export capabilities are currently pending backend API implementation.
+                                    <p className="text-sm text-neutral-500 mb-4">
+                                        Download a unified JSON export of your OpusLex data, including your investigations, documents, and audit logs.
                                     </p>
+                                    <button
+                                        onClick={handleExportData}
+                                        disabled={exportLoading}
+                                        className="btn-primary"
+                                    >
+                                        {exportLoading ? "Exporting..." : "Export My Data"}
+                                    </button>
+                                    {exportError && <p className="text-sm text-red-600 mt-2">{exportError}</p>}
+                                    {exportSuccess && <p className="text-sm text-green-600 mt-2">{exportSuccess}</p>}
                                 </div>
 
                                 {/* Account Deletion */}

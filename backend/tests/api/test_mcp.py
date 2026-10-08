@@ -172,6 +172,27 @@ async def test_mcp_endpoints(token):
                         ret_res = await session.call_tool("retrieve_document_context", {"query": "test", "document_ids": [db_doc_1.id]})
                         assert not ret_res.is_error
                         assert "No relevant documents" in ret_res.content[0].text or "context" in ret_res.content[0].text
+
+                        # Test list_audit_findings
+                        from app.models.investigation import Investigation
+                        from app.models.agent_run import AgentRun
+
+                        db_inv = Investigation(title="Test Investigation", description="Testing", user_id=1, status="open")
+                        db.add(db_inv)
+                        db.commit()
+
+                        db_run = AgentRun(investigation_id=db_inv.id, user_id=1, question="Test Q", status="completed", finding="Test finding")
+                        db.add(db_run)
+                        db.commit()
+
+                        audit_res = await session.call_tool("list_audit_findings", {})
+                        audit_content = audit_res.content[0].text
+                        assert "Test Q" in audit_content
+                        assert "Test finding" in audit_content
+
+                        db.query(AgentRun).filter_by(id=db_run.id).delete()
+                        db.query(Investigation).filter_by(id=db_inv.id).delete()
+                        db.commit()
             finally:
                 db.query(Policy).filter(Policy.title.like("Test MCP Policy%")).delete(synchronize_session=False)
                 db.query(Compliance).filter(Compliance.title.in_(["GDPR Audit", "SOC2 Review"])).delete(synchronize_session=False)

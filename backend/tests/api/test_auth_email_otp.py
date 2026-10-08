@@ -110,7 +110,7 @@ def test_verify_email_otp_new_user(db):
 
 def test_verify_email_otp_existing_user(db):
     user = User(
-        email="existing@example.com",
+        email="existing_otp@example.com",
         password_hash="fakehash",
         role="viewer",
         is_active=True,
@@ -119,7 +119,7 @@ def test_verify_email_otp_existing_user(db):
     db.add(user)
     db.commit()
     
-    _email_otp_state["existing@example.com"] = {
+    _email_otp_state["existing_otp@example.com"] = {
         "code": "654321",
         "expires_at": time.time() + 300,
         "attempts": 0
@@ -127,7 +127,7 @@ def test_verify_email_otp_existing_user(db):
     
     response = client.post(
         "/api/v1/auth/email-otp/verify",
-        json={"email": "existing@example.com", "code": "654321"}
+        json={"email": "existing_otp@example.com", "code": "654321"}
     )
     assert response.status_code == 200
     
@@ -181,7 +181,7 @@ def test_verify_email_otp_expired(db):
 
 def test_verify_email_otp_with_mfa(db):
     user = User(
-        email="mfa@example.com",
+        email="mfa_otp@example.com",
         password_hash="fakehash",
         role="viewer",
         is_active=True,
@@ -192,7 +192,7 @@ def test_verify_email_otp_with_mfa(db):
     db.add(user)
     db.commit()
     
-    _email_otp_state["mfa@example.com"] = {
+    _email_otp_state["mfa_otp@example.com"] = {
         "code": "111111",
         "expires_at": time.time() + 300,
         "attempts": 0
@@ -200,7 +200,7 @@ def test_verify_email_otp_with_mfa(db):
     
     response = client.post(
         "/api/v1/auth/email-otp/verify",
-        json={"email": "mfa@example.com", "code": "111111"}
+        json={"email": "mfa_otp@example.com", "code": "111111"}
     )
     assert response.status_code == 200
     data = response.json()
@@ -210,7 +210,7 @@ def test_verify_email_otp_with_mfa(db):
 
 def test_verify_email_otp_disabled_account(db):
     user = User(
-        email="disabled@example.com",
+        email="disabled_otp@example.com",
         password_hash=None,
         role="viewer",
         is_active=False,
@@ -219,7 +219,7 @@ def test_verify_email_otp_disabled_account(db):
     db.add(user)
     db.commit()
     
-    _email_otp_state["disabled@example.com"] = {
+    _email_otp_state["disabled_otp@example.com"] = {
         "code": "222222",
         "expires_at": time.time() + 300,
         "attempts": 0
@@ -227,6 +227,6 @@ def test_verify_email_otp_disabled_account(db):
     
     response = client.post(
         "/api/v1/auth/email-otp/verify",
-        json={"email": "disabled@example.com", "code": "222222"}
+        json={"email": "disabled_otp@example.com", "code": "222222"}
     )
     assert response.status_code == 403

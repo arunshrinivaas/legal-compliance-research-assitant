@@ -170,6 +170,52 @@ async def retrieve_document_context_tool(
     finally:
         db.close()
 
+@mcp_server.tool("list_audit_findings")
+async def list_audit_findings_tool(
+    ctx: Context,
+    investigation_id: int | None = None,
+    status: str | None = None,
+    limit: int = 50
+) -> str:
+    """Return audit findings (AgentRun records) belonging to the authenticated user."""
+    user_id = mcp_user_id.get()
+    if not user_id:
+        raise ValueError("Unauthenticated tool execution context")
+
+    from sqlalchemy import select
+    from app.models.agent_run import AgentRun
+    from app.models.investigation import Investigation
+
+    db = SessionLocal()
+    try:
+        stmt = (
+            select(AgentRun, Investigation.title.label("inv_title"))
+            .join(Investigation, Investigation.id == AgentRun.investigation_id)
+            .where(AgentRun.user_id == user_id)
+        )
+        if investigation_id is not None:
+            stmt = stmt.where(AgentRun.investigation_id == investigation_id)
+        if status:
+            stmt = stmt.where(AgentRun.status == status)
+
+        rows = db.execute(stmt.order_by(AgentRun.created_at.desc()).limit(limit)).all()
+
+        import json
+        result = []
+        for run, inv_title in rows:
+            result.append({
+                "id": run.id,
+                "investigation_id": run.investigation_id,
+                "investigation_title": inv_title,
+                "question": run.question,
+                "status": run.status,
+                "finding": run.finding,
+                "created_at": run.created_at.isoformat() if run.created_at else None,
+            })
+        return json.dumps(result, indent=2)
+    finally:
+        db.close()
+
 mcp_app = mcp_server.streamable_http_app(
     streamable_http_path="/",
     transport_security=TransportSecuritySettings(

@@ -66,6 +66,8 @@ app.include_router(audit.router)
 app.include_router(governance.router)
 app.include_router(help.router)
 app.include_router(integrations.router)
+from app.routers import data
+app.include_router(data.router)
 
 app.mount("/api/v1/mcp", mcp.AuthBridgeMiddleware(mcp.mcp_app))
 
