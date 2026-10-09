@@ -3,6 +3,7 @@ import {
     ArrowUp,
     FileText,
     FolderLock,
+    MoreHorizontal,
     Paperclip,
     Search,
     Share2,
@@ -687,6 +688,7 @@ function Research() {
                                     Private
                                 </span>
                             </div>
+                            <MoreHorizontal size={14} className="text-neutral-400" />
                         </div>
 
                         <div className="mt-4 space-y-2 text-sm leading-6 text-neutral-700">

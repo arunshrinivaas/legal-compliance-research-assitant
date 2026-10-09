@@ -1,0 +1,95 @@
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
+
+import app.models
+
+from app.routers import (
+    agent,
+    audit,
+    auth,
+    compliance,
+    document,
+    governance,
+    investigations,
+    investigations_presence,
+    investigations_collaborator,
+    policies,
+    rag,
+    regulations,
+    research,
+    knowledge,
+    workspace,
+    help,
+    integrations,
+    mcp,
+)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    async with mcp.mcp_server.session_manager.run():
+        yield
+
+app = FastAPI(
+    title="Legal Compliance Research Assistant",
+    version="1.0.0",
+    lifespan=lifespan,
+)
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+app.include_router(auth.router)
+app.include_router(regulations.router)
+app.include_router(policies.router)
+app.include_router(compliance.router)
+app.include_router(research.router)
+app.include_router(document.router)
+app.include_router(rag.router)
+app.include_router(investigations.router)
+app.include_router(investigations_presence.router)
+app.include_router(investigations_collaborator.router)
+app.include_router(agent.router)
+app.include_router(knowledge.router)
+app.include_router(workspace.router)
+app.include_router(audit.router)
+app.include_router(governance.router)
+app.include_router(help.router)
+app.include_router(integrations.router)
+from app.routers import data
+app.include_router(data.router)
+
+app.mount("/api/v1/mcp", mcp.AuthBridgeMiddleware(mcp.mcp_app))
+
+
+@app.get("/")
+def root():
+    return {
+        "name": "Legal Compliance Research Assistant",
+        "version": "1.0.0",
+        "status": "running",
+    }
+
+
+@app.get("/health")
+def health():
+    return {"status": "healthy"}
+
+
+@app.get("/ready")
+def ready():
+    return {"status": "ready"}

@@ -65,6 +65,8 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
         }
     }, [loginStage, isGsiLoaded]);
 
+    const hasInitializedGsi = useRef(false);
+
     // Load Google Identity Services script
     useEffect(() => {
         const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -74,8 +76,13 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
                 setIsGsiLoaded(true);
                 return;
             }
+            if (hasInitializedGsi.current) {
+                setIsGsiLoaded(true);
+                return;
+            }
             // @ts-ignore
             if (window.google && window.google.accounts) {
+                hasInitializedGsi.current = true;
                 // @ts-ignore
                 window.google.accounts.id.initialize({
                     client_id: clientId,
@@ -647,6 +654,16 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
                                 <ArrowLeft size={16} />
                                 Back
                             </button>
+
+                            {message && (
+                                <div className={`mt-5 p-3 rounded-xl text-xs w-full text-center font-bold ${
+                                    message.includes("success") || message.includes("Welcome") || message.includes("sent")
+                                        ? "bg-green-100 text-green-800"
+                                        : "bg-red-100 text-red-800"
+                                }`}>
+                                    {message}
+                                </div>
+                            )}
                         </div>
                     )}
 

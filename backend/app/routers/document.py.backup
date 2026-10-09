@@ -1,0 +1,124 @@
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from app.config import settings
+from app.database import get_db
+from app.models.document import Document
+from app.models.document_chunk import DocumentChunk
+from app.routers.auth import get_current_user
+from app.schemas.document import DocumentCreate
+from app.services.chunk_service import create_document_chunks
+from app.services.embedding_service import embed_document_chunks
+from app.services.pdf_extractor import extract_text_from_pdf
+
+router = APIRouter(prefix="/api/v1/documents", tags=["Documents"])
+
+
+@router.get("/")
+def get_documents(db: Session = Depends(get_db)):
+    documents = db.query(Document).order_by(Document.uploaded_at.desc()).all()
+
+    result = []
+    for doc in documents:
+        chunk_count = (
+            db.query(func.count(DocumentChunk.id))
+            .filter(DocumentChunk.document_id == doc.id)
+            .scalar()
+        )
+        embedded_count = (
+            db.query(func.count(DocumentChunk.id))
+            .filter(DocumentChunk.document_id == doc.id, DocumentChunk.embedding.is_not(None))
+            .scalar()
+        )
+        if chunk_count == 0:
+            processing_status = "Not processed"
+        elif embedded_count == chunk_count:
+            processing_status = "Ready"
+        else:
+            processing_status = "Processing"
+
+        result.append(
+            {
+                "id": doc.id,
+                "title": doc.title,
+                "filename": doc.filename,
+                "document_type": doc.document_type,
+                "jurisdiction": doc.jurisdiction,
+                "description": doc.description,
+                "user_id": doc.user_id,
+                "uploaded_at": doc.uploaded_at,
+                "chunks": chunk_count,
+                "embedded_chunks": embedded_count,
+                "processing_status": processing_status,
+            }
+        )
+    return {"total": len(result), "items": result}
+
+
+@router.post("/upload")
+async def upload_document(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    upload_dir = Path(settings.upload_dir)
+    upload_dir.mkdir(exist_ok=True)
+
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Filename is required")
+
+    file_path = upload_dir / file.filename
+    with file_path.open("wb") as buffer:
+        buffer.write(await file.read())
+
+    extracted_text = extract_text_from_pdf(str(file_path))
+
+    db_document = Document(
+        title=file.filename,
+        filename=file.filename,
+        document_type="PDF",
+        jurisdiction="Unknown",
+        description=None,
+        user_id=current_user.id,
+        extracted_text=extracted_text,
+    )
+    db.add(db_document)
+    db.commit()
+    db.refresh(db_document)
+
+    chunks = create_document_chunks(db=db, document_id=db_document.id, text=extracted_text)
+    embedded_chunks = embed_document_chunks(db=db, document_id=db_document.id)
+
+    return {
+        "filename": file.filename,
+        "document_id": db_document.id,
+        "text_length": len(extracted_text),
+        "chunks_created": len(chunks),
+        "chunks_embedded": embedded_chunks,
+        "processing_status": "Ready" if embedded_chunks == len(chunks) else "Processing",
+    }
+
+
+@router.delete("/{document_id}", status_code=204)
+def delete_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    document = db.query(Document).filter(Document.id == document_id).first()
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    db.query(DocumentChunk).filter(DocumentChunk.document_id == document_id).delete(
+        synchronize_session=False
+    )
+
+    file_path = Path(settings.upload_dir) / document.filename
+    if file_path.exists():
+        file_path.unlink()
+
+    db.delete(document)
+    db.commit()
