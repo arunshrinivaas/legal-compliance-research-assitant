@@ -195,3 +195,7 @@ frontend/test_gsi.js
 frontend/test_playback.cjs
 frontend/test_prompt.cjs
 frontend/test_video.js
+
+# Local recovery copies
+backend_backup/
+recovery-backend/
