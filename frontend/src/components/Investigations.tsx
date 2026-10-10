@@ -3202,8 +3202,6 @@ function Investigations() {
                     </div>
                 </div>
             )}
-        </div>
-    )
             {shareModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
                     <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
@@ -3294,6 +3292,8 @@ function Investigations() {
                     </div>
                 </div>
             )}
+        </div>
+    )
 }
 
 function DocumentPreviewModal({

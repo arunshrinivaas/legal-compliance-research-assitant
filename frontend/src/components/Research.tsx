@@ -21,6 +21,8 @@ type ResearchQuery = {
     id: number
     question: string
     status: string
+    answer?: string
+    sources?: RagSource[]
     created_at: string | null
 }
 
@@ -492,7 +494,12 @@ function Research() {
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${token}`,
                 },
-                body: JSON.stringify({ question: currentQuestion, status: "Completed" }),
+                body: JSON.stringify({ 
+                    question: currentQuestion, 
+                    status: "Completed",
+                    answer: data.answer || "",
+                    sources: data.sources || []
+                }),
             })
 
             if (saveResponse.ok) {
@@ -777,8 +784,12 @@ function Research() {
                                         <div className="flex-1 min-w-0">
                                             <p
                                                 className="text-sm font-medium cursor-pointer hover:text-neutral-600"
-                                                onClick={() => setQuestion(query.question)}
-                                                title="Click to re-run this question"
+                                                onClick={() => {
+                                                    setQuestion(query.question)
+                                                    if (query.answer) setAnswer(query.answer)
+                                                    if (query.sources) setSources(query.sources)
+                                                }}
+                                                title="Click to view this session"
                                             >
                                                 {query.question}
                                             </p>

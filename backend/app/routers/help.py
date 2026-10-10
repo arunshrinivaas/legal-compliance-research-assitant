@@ -24,10 +24,11 @@ async def ask_help(
         "When the answer is not supported, say so."
     )
     
-    # Passing the user's question as the main input, and the system instructions as context
     answer = await ask_copilot_with_context(
         question=request.query,
-        context=system_prompt,
+        context="",  # No retrieved documents for help yet
+        system_prompt=system_prompt,
+        strict_grounding=False,
     )
 
     return {"answer": answer}

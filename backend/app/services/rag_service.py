@@ -546,6 +546,7 @@ async def answer_with_rag(
     limit: int = 5,
     document_ids: list[int] | None = None,
     user_id: int | None = None,
+    strict_grounding: bool = True,
 ) -> dict:
     context, sources = build_rag_context(
         db=db,
@@ -558,6 +559,7 @@ async def answer_with_rag(
     answer = await ask_copilot_with_context(
         question=question,
         context=context,
+        strict_grounding=strict_grounding,
     )
 
     return {

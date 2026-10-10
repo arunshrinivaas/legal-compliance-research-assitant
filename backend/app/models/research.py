@@ -1,7 +1,7 @@
 from sqlalchemy import text
 from datetime import datetime
 
-from sqlalchemy import String, Text
+from sqlalchemy import String, Text, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -21,6 +21,16 @@ class ResearchQuery(Base):
         String(50),
         nullable=False,
         default="Pending",
+    )
+
+    answer: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    sources: Mapped[list | None] = mapped_column(
+        JSON,
+        nullable=True,
     )
 
     created_at: Mapped[datetime | None] = mapped_column(

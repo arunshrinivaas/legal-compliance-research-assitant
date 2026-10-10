@@ -6,10 +6,21 @@ from copilot import CopilotClient, SessionEventType
 client = CopilotClient()
 
 
-async def test_copilot() -> str:
-    await client.start()
+_client_started = False
+client_lock = asyncio.Lock()
 
-    session = await client.create_session(
+async def get_client():
+    global _client_started
+    async with client_lock:
+        if not _client_started:
+            await client.start()
+            _client_started = True
+    return client
+
+async def test_copilot() -> str:
+    c = await get_client()
+
+    session = await c.create_session(
         model="auto",
     )
 
@@ -43,7 +54,6 @@ async def test_copilot() -> str:
         print("[COPILOT] Request timed out after 30 seconds.")
 
     await session.disconnect()
-    await client.stop()
 
     if not response_text:
         return "No response received from Copilot."
@@ -57,10 +67,12 @@ async def test_copilot() -> str:
 async def ask_copilot_with_context(
     question: str,
     context: str,
+    system_prompt: str = "You are a legal and compliance research assistant.",
+    strict_grounding: bool = True,
 ) -> str:
-    await client.start()
+    c = await get_client()
 
-    session = await client.create_session(
+    session = await c.create_session(
         model="auto",
         streaming=True,
     )
@@ -84,29 +96,34 @@ async def ask_copilot_with_context(
 
     session.on(handle_event)
 
-    prompt = f"""
-You are a legal and compliance research assistant.
-
-Your task is to answer the user's question using ONLY the provided document
-context.
+    if strict_grounding:
+        grounding_rules = """
+Your task is to answer the user's question using ONLY the provided document context.
 
 STRICT GROUNDING RULES:
-
 1. Use only information explicitly supported by the provided context.
-2. Do not invent facts, sources, skills, technologies, legal requirements,
-   or interpretations.
+2. Do not invent facts, sources, skills, technologies, legal requirements, or interpretations.
 3. Preserve the terminology used in the source documents whenever possible.
 4. Do not replace a source term with a similar or assumed term.
-5. If the context does not contain enough information to answer the question,
-   clearly say that the available documents do not contain enough information.
-6. Distinguish between established information and areas of interest or
-   future learning when the source makes that distinction.
-7. Every factual statement derived from the documents must include a source
-   citation.
-8. Use this exact citation format:
-   [Source: filename, Chunk: number]
+5. If the context does not contain enough information to answer the question, clearly say that the available documents do not contain enough information.
+6. Distinguish between established information and areas of interest or future learning when the source makes that distinction.
+7. Every factual statement derived from the documents must include a source citation.
+8. Use this exact citation format: [Source: filename, Chunk: number]
 9. Only cite sources that actually appear in the provided document context.
 10. Do not create or modify filenames, chunk numbers, or source references.
+"""
+    else:
+        grounding_rules = """
+Your task is to answer the user's question. If document context is provided, prioritize it and cite your sources using the format [Source: filename, Chunk: number]. 
+If the context does not contain enough information to fully answer the question, or if no relevant documents were found, you may answer from your general knowledge.
+When answering from general knowledge, you MUST explicitly state that your answer is based on general knowledge and not on specific retrieved evidence. 
+For legal, regulatory, and compliance questions, be accurate, communicate uncertainty, and cite authoritative sources if you know them. Do not fabricate citations or external research.
+"""
+
+    prompt = f"""
+{system_prompt}
+
+{grounding_rules.strip()}
 
 Write the answer clearly and concisely.
 
@@ -122,13 +139,12 @@ Document context:
     await session.send(prompt)
 
     try:
-        await asyncio.wait_for(done.wait(), timeout=45.0)
+        await asyncio.wait_for(done.wait(), timeout=60.0)
     except asyncio.TimeoutError:
-        print("[COPILOT] Request timed out after 45 seconds.")
+        print("[COPILOT] Request timed out after 60 seconds.")
     finally:
         print("Copilot finished generating the answer.")
         await session.disconnect()
-        await client.stop()
 
     if not response_text:
         return "No response received from Copilot."

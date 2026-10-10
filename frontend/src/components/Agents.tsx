@@ -143,7 +143,8 @@ export default function Agents() {
             
             if (!res.ok) {
                 const errData = await res.json();
-                throw new Error(errData.detail || "Failed to run agent");
+                const errMessage = typeof errData.detail === 'string' ? errData.detail : (Array.isArray(errData.detail) ? errData.detail[0]?.msg : "Failed to run agent");
+                throw new Error(errMessage || "Failed to run agent");
             }
             
             const newRun = await res.json();

@@ -93,6 +93,7 @@ async def ask_rag(
             question=request.question,
             limit=request.limit,
             document_ids=document_ids,
+            strict_grounding=(request.investigation_id is not None),
         )
     except RuntimeError as e:
         if "Copilot API failed:" in str(e):

@@ -28,9 +28,9 @@ def create_research_session(
 ):
     db_query = ResearchQuery(
         question=research_query.question,
-        # Respect the status the caller sends (e.g. "Completed").
-        # Previously this always hard-coded "Pending".
         status=research_query.status,
+        answer=research_query.answer,
+        sources=research_query.sources,
     )
     db.add(db_query)
     db.commit()

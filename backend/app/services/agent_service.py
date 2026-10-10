@@ -3,6 +3,7 @@ import json
 import logging
 from typing import Any
 
+from fastapi.concurrency import run_in_threadpool
 from fastapi import HTTPException, status
 from pydantic import ValidationError
 from sqlalchemy import select
@@ -20,12 +21,10 @@ logger = logging.getLogger(__name__)
 
 async def _run_agent_llm(prompt: str) -> str:
     """
-    Executes the LLM prompt using a dedicated local CopilotClient instance.
-    This prevents concurrency issues that arise from sharing the global singleton
-    across concurrent Agent API requests.
+    Executes the LLM prompt using a shared CopilotClient.
     """
-    client = CopilotClient()
-    await client.start()
+    from app.services.copilot_service import get_client
+    client = await get_client()
 
     session = await client.create_session(
         model="auto",
@@ -45,16 +44,26 @@ async def _run_agent_llm(prompt: str) -> str:
             done.set()
 
         elif event.type == SessionEventType.SESSION_ERROR:
+            error_data = getattr(event, "data", None)
+            error_msg = str(error_data)
+            if hasattr(error_data, "message"):
+                error_msg = error_data.message
+            response_text = f"SESSION_ERROR: {error_msg}"
             done.set()
 
     session.on(handle_event)
     await session.send(prompt)
-    await done.wait()
+    try:
+        await asyncio.wait_for(done.wait(), timeout=120.0)
+    except asyncio.TimeoutError:
+        response_text = "SESSION_ERROR: Request timed out after 120 seconds."
     await session.disconnect()
-    await client.stop()
 
     if not response_text:
         raise ValueError("No response received from Copilot.")
+
+    if response_text.startswith("SESSION_ERROR:"):
+        raise RuntimeError(f"Copilot API failed: {response_text[14:].strip()}")
 
     return response_text
 
@@ -123,17 +132,27 @@ async def run_compliance_investigation(
         return agent_run
 
     # 4. Evidence Retrieval (reuse build_rag_context)
-    context, _ = build_rag_context(
-        db=db,
-        query=question,
-        limit=5,
-        document_ids=document_ids,
+    context, _ = await run_in_threadpool(
+        build_rag_context,
+        db,
+        question,
+        5,
+        document_ids,
     )
 
     # 5. Build LLM Prompt
     schema_json = json.dumps(AgentFinding.model_json_schema(), indent=2)
 
-    prompt = f"""
+    if not context or context.strip() == "No relevant documents were found.":
+        agent_run.status = "completed"
+        agent_run.finding = "I cannot answer this question because there is no relevant evidence in the attached investigation documents. I am a Compliance Investigation Agent and am restricted to reasoning only from the provided investigation documents. For general legal questions, please use the Research Assistant."
+        agent_run.risk_score = 0
+        agent_run.risk_level = "Low"
+        db.commit()
+        db.refresh(agent_run)
+        return agent_run
+    else:
+        prompt = f"""
 ROLE:
 You are a Compliance Investigation Agent.
 
@@ -202,6 +221,14 @@ Document context:
         logger.error(f"Agent execution failed: {e}")
         agent_run.status = "failed"
         agent_run.finding = f"Execution error: {str(e)}"
+
+    if agent_run.status == "failed":
+        agent_run.evidence = []
+        agent_run.conflicts = []
+        agent_run.evidence_gaps = []
+        agent_run.applicable_requirements = []
+        agent_run.suggested_actions = []
+        agent_run.citations = []
 
     db.commit()
     db.refresh(agent_run)

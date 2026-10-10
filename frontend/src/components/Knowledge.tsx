@@ -26,10 +26,12 @@ export function Knowledge() {
 
     const fetchPosts = async () => {
         try {
-            const token = localStorage.getItem("token")
+            const token = localStorage.getItem("access_token")
             if (!token) return
 
-            const response = await fetch("/api/v1/knowledge/", {
+            const apiBase = (import.meta.env.VITE_API_URL || "http://127.0.0.1:8000").replace(/\/+$/, "")
+            const baseUrl = apiBase.endsWith("/api/v1") ? apiBase : `${apiBase}/api/v1`
+            const response = await fetch(`${baseUrl}/knowledge/`, {
                 headers: {
                     Authorization: `Bearer ${token}`,
                 },
