@@ -1449,11 +1449,14 @@ function Investigations() {
                                             onClick={(e) => {
                                                 e.stopPropagation()
                                                 setActiveMenuId(null)
-                                                updateInvestigationStatus(selectedInvestigation.id, "Archived")
+                                                updateInvestigationStatus(
+                                                    selectedInvestigation.id,
+                                                    selectedInvestigation.status === "Archived" ? "Active" : "Archived"
+                                                )
                                             }}
                                             className="block w-full px-3 py-1.5 text-left text-xs text-neutral-700 hover:bg-neutral-50"
                                         >
-                                            Archive
+                                            {selectedInvestigation.status === "Archived" ? "Restore" : "Archive"}
                                         </button>
                                         <button
                                             onClick={(e) => {
@@ -1648,12 +1651,15 @@ function Investigations() {
                                                         onClick={(e) => {
                                                             e.stopPropagation()
                                                             setActiveMenuId(null)
-                                                            updateInvestigationStatus(item.id, "Active")
+                                                            updateInvestigationStatus(
+                                                                item.id,
+                                                                item.status === "Archived" ? "Active" : "Archived"
+                                                            )
                                                         }}
                                                         disabled={archivingInvestigation}
                                                         className="block w-full px-3 py-1.5 text-left text-xs text-neutral-700 hover:bg-neutral-50"
                                                     >
-                                                        Restore
+                                                        {item.status === "Archived" ? "Restore" : "Archive"}
                                                     </button>
                                                     <button
                                                         onClick={(e) => {
@@ -1733,12 +1739,27 @@ function Investigations() {
                                                                         onClick={(e) => {
                                                                             e.stopPropagation()
                                                                             setActiveMenuId(null)
-                                                                            updateInvestigationStatus(item.id, "Active")
+                                                                            setEditInvestigationId(item.id)
+                                                                            setEditInvestigationTitle(item.title)
+                                                                            setEditInvestigationDescription(item.description || "")
+                                                                        }}
+                                                                        className="block w-full px-3 py-1.5 text-left text-xs text-neutral-700 hover:bg-neutral-50"
+                                                                    >
+                                                                        Edit
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation()
+                                                                            setActiveMenuId(null)
+                                                                            updateInvestigationStatus(
+                                                                                item.id,
+                                                                                item.status === "Archived" ? "Active" : "Archived"
+                                                                            )
                                                                         }}
                                                                         disabled={archivingInvestigation}
                                                                         className="block w-full px-3 py-1.5 text-left text-xs text-neutral-700 hover:bg-neutral-50"
                                                                     >
-                                                                        Restore
+                                                                        {item.status === "Archived" ? "Restore" : "Archive"}
                                                                     </button>
                                                                     <button
                                                                         onClick={(e) => {
@@ -3348,7 +3369,7 @@ function SectionHeader({
                 </div>
             </div>
 
-            <MoreHorizontal size={14} className="text-neutral-400" />
+
         </div>
     )
 }
